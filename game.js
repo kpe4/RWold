@@ -25,6 +25,7 @@ const state = {
         explored: null, // Will be Uint8Array
         visionRadius: 20
     },
+    
     resources: {
         wood: 0,
         stone: 0
