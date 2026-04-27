@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RimWorld Clone</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui-overlay">
+            <div id="top-bar">
+                <div id="resources">
+                    Wood: <span id="wood-count">0</span> | 
+                    Stone: <span id="stone-count">0</span>
+                </div>
+                <div id="time">Day 1, 08:00</div>
+            </div>
+            <div id="bottom-menu">
+            <button onclick="setOrder('architect')">Architect</button>
+            <button onclick="setOrder('unarchitect')">Unarchitect</button>
+            <button onclick="setOrder('chop')">Chop</button>
+            <button onclick="setOrder('mine')">Mine</button>
+            <button onclick="regenerateWorld()">Regen World</button>
+            <button onclick="setOrder('work')">Work</button>
+        </div>
+            </div>
+            <div id="inspect-panel" class="hidden">
+                <h3 id="inspect-title">Colonist</h3>
+                <div id="inspect-content"></div>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
