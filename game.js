@@ -6,7 +6,7 @@ const ctx = canvas.getContext('2d');
 // Game State
 const state = {
     camera: {
-        x: -8000, // Center on 250,250
+        x: -8000,
         y: -8000,
         zoom: 1,
         isDragging: false,
@@ -57,7 +57,7 @@ const TILE_TYPES = {
     WALL: { color: '#424242', name: 'Wall', solid: true }
 };
 
-// --- Simple Noise Generator (Perlin-like) ---
+// --- Simple Noise Generator ---
 const Noise = {
     p: new Uint8Array(512),
     init() {
@@ -91,7 +91,6 @@ const Noise = {
                             this.lerp(u, this.grad(this.p[ab], x, y - 1),
                                      this.grad(this.p[bb], x - 1, y - 1)));
     },
-    // FBM (Fractal Brownian Motion) for more detail
     fbm(x, y, octaves = 4) {
         let total = 0;
         let frequency = 1;
@@ -103,7 +102,7 @@ const Noise = {
             amplitude *= 0.5;
             frequency *= 2;
         }
-        return (total / maxValue + 1) / 2; // Normalize to 0-1
+        return (total / maxValue + 1) / 2;
     }
 };
 Noise.init();
@@ -135,14 +134,11 @@ function updateCharacterMenu() {
     });
 }
 
-// Initialize Map
 function initMap() {
     state.map.tiles = [];
     state.map.explored = new Uint8Array(state.map.width * state.map.height);
     const seedX = Math.random() * 1000;
     const seedY = Math.random() * 1000;
-    const moistureSeedX = Math.random() * 1000;
-    const moistureSeedY = Math.random() * 1000;
 
     for (let y = 0; y < state.map.height; y++) {
         const row = [];
@@ -150,33 +146,23 @@ function initMap() {
             const nx = x + seedX;
             const ny = y + seedY;
 
-            // 1. Continental Noise (very low frequency - the "macro" shape)
             const continent = Noise.fbm(nx * 0.004, ny * 0.004, 3);
-            
-            // 2. Detail Noise (higher frequency - the "roughness" for coasts and terrain)
             const detail = Noise.fbm(nx * 0.02, ny * 0.02, 4);
-            
-            // 3. Combined Elevation (80% macro shape + 20% detail for natural edges)
             const elevation = (continent * 0.8 + detail * 0.2);
-            
-            // 4. Moisture Noise (separate noise for biomes)
             const moisture = Noise.fbm(nx * 0.015 + 2000, ny * 0.015 + 2000, 3);
 
             let type;
             const sea_level = 0.42;
 
             if (elevation < sea_level) {
-                // Ocean
                 if (elevation < sea_level - 0.15) type = TILE_TYPES.DEEP_WATER;
                 else type = TILE_TYPES.WATER;
             } else {
-                // Land
                 if (elevation < sea_level + 0.02) {
-                    type = TILE_TYPES.SAND; // Coastline
+                    type = TILE_TYPES.SAND;
                 } else if (elevation > 0.82) {
-                    type = TILE_TYPES.STONE; // Mountain peaks
+                    type = TILE_TYPES.STONE;
                 } else {
-                    // Biomes based on moisture
                     if (moisture > 0.75) {
                         const rand = Math.random();
                         if (rand < 0.3) type = TILE_TYPES.TREE;
@@ -185,11 +171,10 @@ function initMap() {
                     }
                     else if (moisture > 0.44) type = TILE_TYPES.GRASS;
                     else if (moisture > 0.37) type = TILE_TYPES.SOIL;
-                    else type = TILE_TYPES.SAND; // Desert
+                    else type = TILE_TYPES.SAND;
                 }
             }
             
-            // Guarantee safe start area (center)
             const distFromCenter = Math.sqrt(Math.pow(x - state.map.width / 2, 2) + Math.pow(y - state.map.height / 2, 2));
             if (distFromCenter < 5) {
                 if (type.solid || type === TILE_TYPES.WATER || type === TILE_TYPES.DEEP_WATER) {
@@ -202,21 +187,9 @@ function initMap() {
         state.map.tiles.push(row);
     }
 
-    // Initialize Chunks
     state.map.chunks = [];
     const chunksX = Math.ceil(state.map.width / state.map.chunkSize);
     const chunksY = Math.ceil(state.map.height / state.map.chunkSize);
-
-    // Count resources for debugging
-    let treeCount = 0;
-    let stoneCount = 0;
-    for (let y = 0; y < state.map.height; y++) {
-        for (let x = 0; x < state.map.width; x++) {
-            if (state.map.tiles[y][x].type === TILE_TYPES.TREE) treeCount++;
-            if (state.map.tiles[y][x].type === TILE_TYPES.STONE) stoneCount++;
-        }
-    }
-    console.log(`Map Generated: ${treeCount} Trees, ${stoneCount} Stone Ores`);
 
     for (let cy = 0; cy < chunksY; cy++) {
         const row = [];
@@ -234,6 +207,8 @@ function initMap() {
         }
         state.map.chunks.push(row);
     }
+    
+    console.log("Map initialized");
 }
 
 function updateChunk(chunk) {
@@ -249,94 +224,11 @@ function updateChunk(chunk) {
             const gx = chunk.cx * size + lx;
             
             if (gy < state.map.height && gx < state.map.width) {
-                // Fog of War check
                 if (state.map.fogOfWarEnabled && state.map.explored[gy * state.map.width + gx] === 0) continue;
 
                 const tile = state.map.tiles[gy][gx];
                 ctx.fillStyle = tile.type.color;
                 ctx.fillRect(lx * ts, ly * ts, ts, ts);
-
-                // Add visual detail for special tiles
-                if (tile.type === TILE_TYPES.GRASS) {
-                    // Detailed grass blades
-                    ctx.lineWidth = 1;
-                    ctx.lineCap = 'round';
-                    for (let i = 0; i < 6; i++) {
-                        const ox = (gx * 13 + i * 9) % (ts - 6) + 3;
-                        const oy = (gy * 17 + i * 13) % (ts - 6) + 6;
-                        const h = 4 + (gx + gy + i) % 5;
-                        const angle = ((gx + gy + i) % 10 - 5) * 0.1; // Slight lean
-                        
-                        // Use a slightly lighter/yellowish green for highlights
-                        ctx.strokeStyle = `rgba(160, 210, 100, ${0.4 + (i % 3) * 0.1})`;
-                        
-                        ctx.beginPath();
-                        ctx.moveTo(lx * ts + ox, ly * ts + oy);
-                        ctx.lineTo(lx * ts + ox + angle * h, ly * ts + oy - h);
-                        ctx.stroke();
-                        
-                        // Add a second tiny blade for a tuft effect
-                        if (i % 2 === 0) {
-                            ctx.beginPath();
-                            ctx.moveTo(lx * ts + ox + 2, ly * ts + oy);
-                            ctx.lineTo(lx * ts + ox + 2 + angle * (h-1), ly * ts + oy - h + 1);
-                            ctx.stroke();
-                        }
-                    }
-                } else if (tile.type === TILE_TYPES.SOIL) {
-                    // Small gray pebbles
-                    for (let i = 0; i < 5; i++) {
-                        const ox = (gx * 23 + i * 13) % (ts - 6) + 3;
-                        const oy = (gy * 29 + i * 19) % (ts - 6) + 3;
-                        const size = 1 + (gx + gy + i) % 2;
-                        const gray = 100 + (gx * i) % 50;
-                        ctx.fillStyle = `rgba(${gray}, ${gray}, ${gray}, 0.6)`;
-                        ctx.beginPath();
-                        ctx.arc(lx * ts + ox, ly * ts + oy, size, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                } else if (tile.type === TILE_TYPES.BERRY_BUSH) {
-                    // Berry Bush rendering (Dark green bush with red berries)
-                    ctx.fillStyle = '#2e7d32'; 
-                    ctx.beginPath();
-                    ctx.arc(lx * ts + ts * 0.5, ly * ts + ts * 0.6, ts * 0.35, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Berries
-                    ctx.fillStyle = '#e53935';
-                    for (let i = 0; i < 6; i++) {
-                        const ox = (gx * 31 + i * 13) % (ts - 10) + 5;
-                        const oy = (gy * 37 + i * 17) % (ts - 10) + 5;
-                        ctx.beginPath();
-                        ctx.arc(lx * ts + ox, ly * ts + oy, 2.2, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                } else if (tile.type === TILE_TYPES.TREE) {
-                    // Big tree
-                    ctx.fillStyle = '#4e342e'; // Darker trunk
-                    ctx.fillRect(lx * ts + ts * 0.4, ly * ts + ts * 0.6, ts * 0.2, ts * 0.3);
-                    
-                    // Layered canopy
-                    ctx.fillStyle = '#2e7d32';
-                    ctx.beginPath();
-                    ctx.arc(lx * ts + ts * 0.5, ly * ts + ts * 0.45, ts * 0.3, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.fillStyle = '#388e3c';
-                    ctx.beginPath();
-                    ctx.arc(lx * ts + ts * 0.4, ly * ts + ts * 0.35, ts * 0.2, 0, Math.PI * 2);
-                    ctx.fill();
-                } else if (tile.type === TILE_TYPES.STONE) {
-                    // Stone texture
-                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
-                    for (let i = 0; i < 3; i++) {
-                        const ox = (gx * 37 + i * 11) % (ts - 8) + 4;
-                        const oy = (gy * 41 + i * 13) % (ts - 8) + 4;
-                        ctx.beginPath();
-                        ctx.moveTo(lx * ts + ox, ly * ts + oy);
-                        ctx.lineTo(lx * ts + ox + 4, ly * ts + oy + 2);
-                        ctx.stroke();
-                    }
-                }
             }
         }
     }
@@ -378,11 +270,7 @@ function updateFogOfWar() {
 function isWalkable(tx, ty) {
     if (tx < 0 || tx >= state.map.width || ty < 0 || ty >= state.map.height) return false;
     const tile = state.map.tiles[ty][tx];
-    
-    // Solid tiles are never walkable
     if (tile.type.solid) return false;
-    
-    // Water tiles are walkable only if they are "shallow" (next to land)
     if (tile.type === TILE_TYPES.WATER) {
         const neighbors = [
             {x: tx-1, y: ty}, {x: tx+1, y: ty},
@@ -396,13 +284,12 @@ function isWalkable(tx, ty) {
         });
         return isNearLand;
     }
-    
     return true;
 }
 
 function isPathClearOfWater(startX, startY, endX, endY) {
     const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-    const steps = Math.ceil(dist * 2); // Sample twice per tile length
+    const steps = Math.ceil(dist * 2);
     
     for (let i = 0; i <= steps; i++) {
         const t = i / steps;
@@ -410,12 +297,9 @@ function isPathClearOfWater(startX, startY, endX, endY) {
         const y = Math.floor(startY + (endY - startY) * t);
         
         if (x < 0 || x >= state.map.width || y < 0 || y >= state.map.height) return false;
-        
-        // Skip check for the very last tile (destination) so we can walk to trees/rocks
         if (x === Math.floor(endX) && y === Math.floor(endY)) continue;
 
         const tile = state.map.tiles[y][x];
-        // If it's water (of any kind) or solid, the path is NOT clear
         if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER || tile.type.solid) {
             return false;
         }
@@ -423,13 +307,13 @@ function isPathClearOfWater(startX, startY, endX, endY) {
     return true;
 }
 
-// Initialize Colonists
 function initEntities() {
+    state.entities = [];
     state.entities.push({
         id: 1,
         name: 'Yarec Burmaldec',
-        x: 50.5,
-        y: 50.5,
+        x: 250.5,
+        y: 250.5,
         color: '#ffcc80',
         target: null,
         job: null,
@@ -440,8 +324,8 @@ function initEntities() {
     state.entities.push({
         id: 2,
         name: 'Arcenec Burmaldec',
-        x: 51.5,
-        y: 50.5,
+        x: 251.5,
+        y: 250.5,
         color: '#f48fb1',
         target: null,
         job: null,
@@ -452,8 +336,8 @@ function initEntities() {
     state.entities.push({
         id: 3,
         name: 'Timurec Burmaldec',
-        x: 50.5,
-        y: 51.5,
+        x: 250.5,
+        y: 251.5,
         color: '#90caf9',
         target: null,
         job: null,
@@ -464,7 +348,6 @@ function initEntities() {
     updateCharacterMenu();
 }
 
-// --- Pathfinding (A*) ---
 function findPath(startX, startY, endX, endY) {
     startX = Math.floor(startX);
     startY = Math.floor(startY);
@@ -475,19 +358,14 @@ function findPath(startX, startY, endX, endY) {
     const destTile = state.map.tiles[endY][endX];
     if (!isWalkable(endX, endY) && !destTile.type.harvestable) return null;
 
-    const openSet = [{ x: startX, y: startY, g: 0, h: dist(startX, startY, endX, endY), f: 0, parent: null }];
+    const openSet = [{ x: startX, y: startY, g: 0, h: Math.abs(startX - endX) + Math.abs(startY - endY), f: 0, parent: null }];
     const closedSet = new Set();
     
-    function dist(x1, y1, x2, y2) {
-        return Math.abs(x1 - x2) + Math.abs(y1 - y2);
-    }
-
     const maxIterations = 1000;
     let iterations = 0;
 
     while (openSet.length > 0 && iterations < maxIterations) {
         iterations++;
-        // Get lowest f score
         let currentIdx = 0;
         for (let i = 1; i < openSet.length; i++) {
             if (openSet[i].f < openSet[currentIdx].f) currentIdx = i;
@@ -515,14 +393,11 @@ function findPath(startX, startY, endX, endY) {
 
         for (const neighbor of neighbors) {
             if (closedSet.has(`${neighbor.x},${neighbor.y}`)) continue;
-            
             const isDest = neighbor.x === endX && neighbor.y === endY;
             if (!isWalkable(neighbor.x, neighbor.y) && !isDest) continue;
 
-            // Use move cost from tile type
             const tile = state.map.tiles[neighbor.y][neighbor.x];
             const cost = tile.type.moveCost || 1;
-
             const gScore = current.g + cost;
             let neighborNode = openSet.find(n => n.x === neighbor.x && n.y === neighbor.y);
 
@@ -531,7 +406,7 @@ function findPath(startX, startY, endX, endY) {
                     x: neighbor.x,
                     y: neighbor.y,
                     g: gScore,
-                    h: dist(neighbor.x, neighbor.y, endX, endY),
+                    h: Math.abs(neighbor.x - endX) + Math.abs(neighbor.y - endY),
                     f: 0,
                     parent: current
                 };
@@ -544,21 +419,87 @@ function findPath(startX, startY, endX, endY) {
             }
         }
     }
-
-    return null; // No path found
+    return null;
 }
 
-// Resize Canvas
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
 
-// Input Handling
-window.addEventListener('contextmenu', (e) => e.preventDefault());
+// ========== СИСТЕМА ОЧЕРЕДИ ДЕЙСТВИЙ ==========
+class ActionQueue {
+    constructor() {
+        this.queue = [];
+        this.isBusy = false;
+        this.shiftPressed = false;
+    }
+    
+    addAction(action, delay = 300) {
+        this.queue.push({ action, delay });
+        if (!this.isBusy) {
+            this.executeNext();
+        }
+    }
+    
+    executeNext() {
+        if (this.queue.length === 0) {
+            this.isBusy = false;
+            return;
+        }
+        
+        this.isBusy = true;
+        const { action, delay } = this.queue.shift();
+        
+        setTimeout(() => {
+            action();
+            this.executeNext();
+        }, delay);
+    }
+    
+    clear() {
+        this.queue = [];
+        this.isBusy = false;
+    }
+}
+
+const actionQueue = new ActionQueue();
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Shift') {
+        actionQueue.shiftPressed = true;
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key === 'Shift') {
+        actionQueue.shiftPressed = false;
+    }
+});
+
+// Функция для создания команды движения
+function executeMoveCommand(entity, tx, ty) {
+    if (!entity) return;
+    console.log(`▶️ ${entity.name} идет в ${tx},${ty}`);
+    
+    if (isPathClearOfWater(entity.x, entity.y, tx, ty)) {
+        entity.path = [{ x: tx + 0.5, y: ty + 0.5 }];
+        entity.target = entity.path[0];
+        entity.job = null;
+        entity.isManualMove = true;
+    } else {
+        const path = findPath(entity.x, entity.y, tx, ty);
+        if (path) {
+            entity.path = path;
+            entity.target = path[0];
+            entity.job = null;
+            entity.isManualMove = true;
+        }
+    }
+    updateInspectPanel(entity);
+}
 
 window.addEventListener('mousedown', (e) => {
-    // Prevent clicking through UI
     if (e.target.closest('#top-bar') || 
         e.target.closest('#bottom-menu') || 
         e.target.closest('#inspect-panel') || 
@@ -567,7 +508,7 @@ window.addEventListener('mousedown', (e) => {
         return;
     }
 
-    if (e.button === 2 || e.button === 1 || (e.button === 0 && e.shiftKey)) { // Right, Middle, or Shift+Left
+    if (e.button === 2 || e.button === 1 || (e.button === 0 && e.shiftKey)) {
         state.camera.isDragging = true;
         state.camera.lastMouseX = e.clientX;
         state.camera.lastMouseY = e.clientY;
@@ -605,7 +546,6 @@ window.addEventListener('mousedown', (e) => {
 
                 if (job) {
                     state.jobs.push(job);
-                    // If an entity is selected, assign it immediately
                     if (state.selectedEntity) {
                         assignJobToEntity(state.selectedEntity, job);
                     }
@@ -613,67 +553,45 @@ window.addEventListener('mousedown', (e) => {
             }
         }
     } else if (e.button === 0 && state.selectedEntity) {
-    // If an entity is already selected, left-click issues a move command
-    const worldPos = screenToWorld(e.clientX, e.clientY);
-    const tx = Math.floor(worldPos.x / state.map.tileSize);
-    const ty = Math.floor(worldPos.y / state.map.tileSize);
-    
-    // Check if we're clicking another entity to switch selection
-    const clickedEnt = state.entities.find(ent => {
-        const dx = ent.x - (worldPos.x / state.map.tileSize);
-        const dy = ent.y - (worldPos.y / state.map.tileSize);
-        return Math.sqrt(dx * dx + dy * dy) < 0.6;
-    });
-
-    if (clickedEnt && clickedEnt !== state.selectedEntity) {
-        // Switch selection (всегда сразу, без очереди)
-        selectEntity(clickedEnt);
-    } else if (isWalkable(tx, ty)) {
-        // ★★★ НОВАЯ ЛОГИКА С ОЧЕРЕДЬЮ ★★★
-        const moveCommand = () => {
-            console.log(`▶️ Выполняю команду движения для ${state.selectedEntity.name} в ${tx},${ty}`);
-            
-            if (isPathClearOfWater(state.selectedEntity.x, state.selectedEntity.y, tx, ty)) {
-                state.selectedEntity.path = [{ x: tx + 0.5, y: ty + 0.5 }];
-                state.selectedEntity.target = state.selectedEntity.path[0];
-                state.selectedEntity.job = null;
-                state.selectedEntity.isManualMove = true;
-            } else {
-                const path = findPath(state.selectedEntity.x, state.selectedEntity.y, tx, ty);
-                if (path) {
-                    state.selectedEntity.path = path;
-                    state.selectedEntity.target = path[0];
-                    state.selectedEntity.job = null;
-                    state.selectedEntity.isManualMove = true;
-                }
-            }
-            updateInspectPanel(state.selectedEntity);
-        };
-        
-        // Используем очередь с проверкой Shift
-        if (actionQueue.shiftPressed) {
-            console.log(`📌 Добавляю в очередь: движение в ${tx},${ty}`);
-            actionQueue.addAction(moveCommand, 300);
-        } else {
-            console.log(`⚡ Очищаю очередь и выполняю сразу: движение в ${tx},${ty}`);
-            actionQueue.clear();
-            // Останавливаем текущее движение персонажа
-            state.selectedEntity.path = [];
-            state.selectedEntity.target = null;
-            state.selectedEntity.job = null;
-            moveCommand();
-        }
-    } else {
-        deselectEntity();
-    }
-}
-    } else if (e.button === 0 && !state.currentOrder) {
-        // Inspect & Select logic
         const worldPos = screenToWorld(e.clientX, e.clientY);
         const tx = Math.floor(worldPos.x / state.map.tileSize);
         const ty = Math.floor(worldPos.y / state.map.tileSize);
         
-        // Check for entities first
+        const clickedEnt = state.entities.find(ent => {
+            const dx = ent.x - (worldPos.x / state.map.tileSize);
+            const dy = ent.y - (worldPos.y / state.map.tileSize);
+            return Math.sqrt(dx * dx + dy * dy) < 0.6;
+        });
+
+        if (clickedEnt && clickedEnt !== state.selectedEntity) {
+            selectEntity(clickedEnt);
+        } else if (isWalkable(tx, ty)) {
+            // ★★★ НОВАЯ ЛОГИКА С ОЧЕРЕДЬЮ ★★★
+            const entity = state.selectedEntity;
+            
+            if (actionQueue.shiftPressed) {
+                console.log(`📌 Добавляю в очередь: ${entity.name} → ${tx},${ty}`);
+                actionQueue.addAction(() => {
+                    if (state.selectedEntity === entity) {
+                        executeMoveCommand(entity, tx, ty);
+                    }
+                }, 300);
+            } else {
+                console.log(`⚡ Очищаю очередь и двигаю ${entity.name} в ${tx},${ty}`);
+                actionQueue.clear();
+                entity.path = [];
+                entity.target = null;
+                entity.job = null;
+                executeMoveCommand(entity, tx, ty);
+            }
+        } else {
+            deselectEntity();
+        }
+    } else if (e.button === 0 && !state.currentOrder) {
+        const worldPos = screenToWorld(e.clientX, e.clientY);
+        const tx = Math.floor(worldPos.x / state.map.tileSize);
+        const ty = Math.floor(worldPos.y / state.map.tileSize);
+        
         const clickedEnt = state.entities.find(ent => {
             const dx = ent.x - (worldPos.x / state.map.tileSize);
             const dy = ent.y - (worldPos.y / state.map.tileSize);
@@ -694,7 +612,7 @@ window.addEventListener('mousedown', (e) => {
 
 function selectEntity(ent) {
     state.selectedEntity = ent;
-    ent.isManualMove = false; // Reset manual move on new selection
+    ent.isManualMove = false;
     updateInspectPanel(ent);
     updateCharacterMenu();
 }
@@ -715,7 +633,10 @@ function updateInspectPanel(ent) {
         <p>Status: ${ent.job ? 'Working' : (ent.target ? 'Moving' : 'Idle')}</p>
         <p>Food: ${Math.floor(ent.needs.food)}%</p>
         <p>Rest: ${Math.floor(ent.needs.rest)}%</p>
-        <p style="color: #81d4fa; font-size: 0.8em;">(Left-click to move)</p>
+        <p style="color: #81d4fa; font-size: 0.8em;">
+            ${actionQueue.shiftPressed ? '🔗 SHIFT зажат - команды в очередь' : 'Left-click to move (Hold Shift для очереди)'}
+            ${actionQueue.queue.length ? ` | 📋 Очередь: ${actionQueue.queue.length}` : ''}
+        </p>
     `;
 }
 
@@ -736,7 +657,7 @@ function screenToWorld(screenX, screenY) {
 
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
-        e.preventDefault(); // Prevent scrolling
+        e.preventDefault();
         deselectEntity();
     } else if (e.code === 'KeyL') {
         toggleFogOfWar();
@@ -753,13 +674,11 @@ function toggleUI() {
 
 function toggleFogOfWar() {
     state.map.fogOfWarEnabled = !state.map.fogOfWarEnabled;
-    // Mark all chunks as dirty to re-render with/without fog
     for (let cy = 0; cy < state.map.chunks.length; cy++) {
         for (let cx = 0; cx < state.map.chunks[cy].length; cx++) {
             state.map.chunks[cy][cx].dirty = true;
         }
     }
-    console.log(`Fog of War: ${state.map.fogOfWarEnabled ? 'Enabled' : 'Disabled'}`);
 }
 
 window.addEventListener('mousemove', (e) => {
@@ -774,51 +693,28 @@ window.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mouseup', (e) => {
-    if (state.camera.isDragging && e.button === 2) {
-        // If it was a right-click drag, check if it was actually a click or a drag
-        const dx = e.clientX - state.camera.dragStartX;
-        const dy = e.clientY - state.camera.dragStartY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        // If moved less than 5 pixels, treat as a right-click
-        if (dist < 5) {
-            // Right click now does nothing specific by default, 
-            // but we keep the detection logic in case we want right-click deselect or similar
-        }
-    }
     state.camera.isDragging = false;
 });
 
 window.addEventListener('wheel', (e) => {
     e.preventDefault();
-    
-    // Smooth zoom factor
     const factor = e.deltaY > 0 ? 0.9 : 1.1;
-    const oldZoom = state.camera.zoom;
     const newZoom = Math.max(0.1, Math.min(5, state.camera.zoom * factor));
-    
-    if (newZoom !== oldZoom) {
-        // Zoom towards mouse position
+    if (newZoom !== state.camera.zoom) {
         const mouseWorldBefore = screenToWorld(e.clientX, e.clientY);
         state.camera.zoom = newZoom;
         const mouseWorldAfter = screenToWorld(e.clientX, e.clientY);
-        
         state.camera.x += (mouseWorldAfter.x - mouseWorldBefore.x);
         state.camera.y += (mouseWorldAfter.y - mouseWorldBefore.y);
-        
-        console.log(`Zoom: ${state.camera.zoom.toFixed(2)}`);
     }
 }, { passive: false });
 
 function assignJobToEntity(ent, job) {
-    // If entity already has a job, unassign it
     if (ent.job) {
         ent.job.assigned = false;
     }
-    
     ent.job = job;
     job.assigned = true;
-    
     if (isPathClearOfWater(ent.x, ent.y, job.x, job.y)) {
         ent.path = [{ x: job.x + 0.5, y: job.y + 0.5 }];
         ent.target = ent.path[0];
@@ -831,10 +727,8 @@ function assignJobToEntity(ent, job) {
     }
 }
 
-// Update Game State
 function update() {
     updateFogOfWar();
-    // Update Time
     state.time.tick++;
     if (state.time.tick % 60 === 0) {
         state.time.minute++;
@@ -849,12 +743,9 @@ function update() {
         updateTimeUI();
     }
 
-    // Update Entities
     state.entities.forEach(ent => {
-        // Freeze selected entity UNLESS it's a manual move command OR a job
         if (state.selectedEntity === ent && !ent.isManualMove && !ent.job) return;
 
-        // Find job if idle
         if (!ent.job && !ent.target) {
             const availableJob = state.jobs.find(j => !j.assigned);
             if (availableJob) {
@@ -869,10 +760,8 @@ function update() {
             if (dist < 0.1) {
                 ent.x = ent.target.x;
                 ent.y = ent.target.y;
-                
-                // If there's a path, move to next waypoint
                 if (ent.path && ent.path.length > 0) {
-                    ent.path.shift(); // Remove current waypoint
+                    ent.path.shift();
                     if (ent.path.length > 0) {
                         ent.target = ent.path[0];
                     } else {
@@ -895,17 +784,14 @@ function update() {
                 ent.y += (dy / dist) * ent.speed * speedMult;
             }
         } else if (ent.job) {
-            // Working on job
             ent.job.progress += 0.5;
             if (ent.job.progress >= 100) {
                 const tx = ent.job.x;
                 const ty = ent.job.y;
-
                 if (ent.job.type === 'build_wall') {
                     state.map.tiles[ty][tx].type = TILE_TYPES.WALL;
                 } else if (ent.job.type === 'chop') {
-                    const tile = state.map.tiles[ty][tx];
-                    if (tile.type === TILE_TYPES.BERRY_BUSH) {
+                    if (state.map.tiles[ty][tx].type === TILE_TYPES.BERRY_BUSH) {
                         state.resources.berries += 15;
                     } else {
                         state.resources.wood += 20;
@@ -917,31 +803,12 @@ function update() {
                 } else if (ent.job.type === 'destruct') {
                     state.map.tiles[ty][tx].type = TILE_TYPES.GRASS;
                 }
-
                 markTileDirty(tx, ty);
                 state.jobs = state.jobs.filter(j => j !== ent.job);
                 ent.job = null;
                 ent.target = null;
                 ent.path = [];
                 updateResourceUI();
-            }
-        } else {
-            // Idle movement
-            if (Math.random() < 0.01) {
-                const tx = Math.floor(ent.x + (Math.random() * 10 - 5));
-                const ty = Math.floor(ent.y + (Math.random() * 10 - 5));
-                if (isWalkable(tx, ty)) {
-                    if (isPathClearOfWater(ent.x, ent.y, tx, ty)) {
-                        ent.path = [{ x: tx + 0.5, y: ty + 0.5 }];
-                        ent.target = ent.path[0];
-                    } else {
-                        const path = findPath(ent.x, ent.y, tx, ty);
-                        if (path) {
-                            ent.path = path;
-                            ent.target = path[0];
-                        }
-                    }
-                }
             }
         }
     });
@@ -955,16 +822,13 @@ function updateTimeUI() {
     timeDisplay.innerText = `Day ${state.time.day}, ${h}:${m}`;
 }
 
-// Render Loop
 function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(state.camera.zoom, state.camera.zoom);
     ctx.translate(state.camera.x, state.camera.y);
 
-    // Draw Map (Chunks)
     const viewW = canvas.width / state.camera.zoom;
     const viewH = canvas.height / state.camera.zoom;
     const worldViewLeft = -state.camera.x - viewW / 2;
@@ -978,324 +842,4 @@ function render() {
 
     for (let cy = Math.max(0, startCY); cy < Math.min(state.map.chunks.length, endCY); cy++) {
         for (let cx = Math.max(0, startCX); cx < Math.min(state.map.chunks[cy].length, endCX); cx++) {
-            const chunk = state.map.chunks[cy][cx];
-            if (chunk.dirty) updateChunk(chunk);
-            ctx.drawImage(chunk.canvas, cx * chunkSizePx, cy * chunkSizePx);
-        }
-    }
-
-    // Grid (only if zoomed in)
-    if (state.camera.zoom > 0.5) {
-        ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-        ctx.lineWidth = 1 / state.camera.zoom;
-        ctx.beginPath();
-        
-        const startTX = Math.floor(worldViewLeft / state.map.tileSize);
-        const endTX = Math.ceil((worldViewLeft + viewW) / state.map.tileSize);
-        const startTY = Math.floor(worldViewTop / state.map.tileSize);
-        const endTY = Math.ceil((worldViewTop + viewH) / state.map.tileSize);
-
-        for (let x = Math.max(0, startTX); x <= Math.min(state.map.width, endTX); x++) {
-            ctx.moveTo(x * state.map.tileSize, Math.max(0, startTY) * state.map.tileSize);
-            ctx.lineTo(x * state.map.tileSize, Math.min(state.map.height, endTY) * state.map.tileSize);
-        }
-        for (let y = Math.max(0, startTY); y <= Math.min(state.map.height, endTY); y++) {
-            ctx.moveTo(Math.max(0, startTX) * state.map.tileSize, y * state.map.tileSize);
-            ctx.lineTo(Math.min(state.map.width, endTX) * state.map.tileSize, y * state.map.tileSize);
-        }
-        ctx.stroke();
-    }
-
-    // Ghost wall for architect mode
-    if (state.currentOrder === 'architect') {
-        const mouseWorld = screenToWorld(state.camera.lastMouseX, state.camera.lastMouseY);
-        const tx = Math.floor(mouseWorld.x / state.map.tileSize);
-        const ty = Math.floor(mouseWorld.y / state.map.tileSize);
-        if (tx >= 0 && tx < state.map.width && ty >= 0 && ty < state.map.height) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.fillRect(tx * state.map.tileSize, ty * state.map.tileSize, state.map.tileSize, state.map.tileSize);
-        }
-    } else if (state.currentOrder === 'unarchitect') {
-        const mouseWorld = screenToWorld(state.camera.lastMouseX, state.camera.lastMouseY);
-        const tx = Math.floor(mouseWorld.x / state.map.tileSize);
-        const ty = Math.floor(mouseWorld.y / state.map.tileSize);
-        if (tx >= 0 && tx < state.map.width && ty >= 0 && ty < state.map.height) {
-            ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-            ctx.fillRect(tx * state.map.tileSize, ty * state.map.tileSize, state.map.tileSize, state.map.tileSize);
-        }
-    }
-
-    // Draw Jobs (Blueprints)
-    state.jobs.forEach(job => {
-        if (job.type === 'build_wall') {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.setLineDash([5, 5]);
-            ctx.strokeRect(job.x * state.map.tileSize + 2, job.y * state.map.tileSize + 2, state.map.tileSize - 4, state.map.tileSize - 4);
-            ctx.setLineDash([]);
-            
-            if (job.progress > 0) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                const h = (state.map.tileSize - 4) * (job.progress / 100);
-                ctx.fillRect(job.x * state.map.tileSize + 2, job.y * state.map.tileSize + state.map.tileSize - 2 - h, state.map.tileSize - 4, h);
-            }
-        } else if (job.type === 'destruct') {
-            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-            ctx.setLineDash([2, 2]);
-            ctx.strokeRect(job.x * state.map.tileSize + 2, job.y * state.map.tileSize + 2, state.map.tileSize - 4, state.map.tileSize - 4);
-            ctx.setLineDash([]);
-            
-            if (job.progress > 0) {
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-                const h = (state.map.tileSize - 4) * (job.progress / 100);
-                ctx.fillRect(job.x * state.map.tileSize + 2, job.y * state.map.tileSize + state.map.tileSize - 2 - h, state.map.tileSize - 4, h);
-            }
-        }
-    });
-
-    // Draw Entities
-    state.entities.forEach(ent => {
-        // Selection circle
-        if (state.selectedEntity === ent) {
-            ctx.strokeStyle = '#81d4fa';
-            ctx.lineWidth = 2 / state.camera.zoom;
-            ctx.beginPath();
-            ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 2, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-
-        ctx.fillStyle = ent.color;
-        ctx.beginPath();
-        ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 3, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Name tag
-        ctx.fillStyle = 'white';
-        ctx.font = '10px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(ent.name, ent.x * state.map.tileSize, ent.y * state.map.tileSize - 15);
-    });
-
-    // Darkening at the edges of the world
-    const edgeSize = 1000; // Pixels from the edge where darkening starts
-    const mapW = state.map.width * state.map.tileSize;
-    const mapH = state.map.height * state.map.tileSize;
-
-    ctx.fillStyle = 'black';
-    // Left edge
-    let grad = ctx.createLinearGradient(0, 0, edgeSize, 0);
-    grad.addColorStop(0, 'rgba(0,0,0,0.8)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, edgeSize, mapH);
-
-    // Right edge
-    grad = ctx.createLinearGradient(mapW - edgeSize, 0, mapW, 0);
-    grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.8)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(mapW - edgeSize, 0, edgeSize, mapH);
-
-    // Top edge
-    grad = ctx.createLinearGradient(0, 0, 0, edgeSize);
-    grad.addColorStop(0, 'rgba(0,0,0,0.8)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, mapW, edgeSize);
-
-    // Bottom edge
-    grad = ctx.createLinearGradient(0, mapH - edgeSize, 0, mapH);
-    grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.8)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, mapH - edgeSize, mapW, edgeSize);
-
-    ctx.restore();
-
-    // Screen Vignette (Atmospheric)
-    const vignette = ctx.createRadialGradient(
-        canvas.width / 2, canvas.height / 2, 0,
-        canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.7
-    );
-    vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(0,0,0,0.5)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    update();
-    requestAnimationFrame(render);
-}
-
-// Global functions for UI
-window.regenerateWorld = function() {
-    initMap();
-    
-    // Reset colonist positions to a valid land tile within 5 tiles of each other
-    let baseSpawnX = state.map.width / 2;
-    let baseSpawnY = state.map.height / 2;
-    
-    // Find ALL valid land tiles
-    const landTiles = [];
-    for (let y = 0; y < state.map.height; y++) {
-        for (let x = 0; x < state.map.width; x++) {
-            const tile = state.map.tiles[y][x];
-            if (!tile.type.solid && 
-                tile.type !== TILE_TYPES.WATER && 
-                tile.type !== TILE_TYPES.DEEP_WATER) {
-                landTiles.push({x, y});
-            }
-        }
-    }
-
-    if (landTiles.length > 0) {
-        const randomBase = landTiles[Math.floor(Math.random() * landTiles.length)];
-        baseSpawnX = randomBase.x;
-        baseSpawnY = randomBase.y;
-    }
-
-    state.entities.forEach(ent => {
-        let spawnX = baseSpawnX;
-        let spawnY = baseSpawnY;
-        
-        // Try to find a land tile within 5 tiles of the base spawn
-        const nearbyLand = landTiles.filter(t => 
-            Math.abs(t.x - baseSpawnX) <= 5 && 
-            Math.abs(t.y - baseSpawnY) <= 5
-        );
-
-        if (nearbyLand.length > 0) {
-            const randomTile = nearbyLand[Math.floor(Math.random() * nearbyLand.length)];
-            spawnX = randomTile.x;
-            spawnY = randomTile.y;
-        }
-        
-        ent.x = spawnX + 0.5;
-        ent.y = spawnY + 0.5;
-        ent.target = null;
-        ent.job = null;
-        ent.path = [];
-    });
-    
-    state.jobs = [];
-    
-    // Center camera on the group
-    state.camera.x = -(baseSpawnX * state.map.tileSize);
-    state.camera.y = -(baseSpawnY * state.map.tileSize);
-    
-    updateCharacterMenu();
-    updateFogOfWar();
-    console.log("World regenerated and camera centered on colonists");
-};
-
-window.setOrder = function(type) {
-    if (state.currentOrder === type) {
-        state.currentOrder = null;
-    } else {
-        state.currentOrder = type;
-    }
-    
-    // Highlight active button
-    const buttons = document.querySelectorAll('#bottom-menu button');
-    buttons.forEach(btn => {
-        if (btn.innerText.toLowerCase() === type) {
-            btn.style.background = state.currentOrder === type ? '#555' : '#333';
-        } else {
-            btn.style.background = '#333';
-        }
-    });
-};
-
-// Start Game
-window.addEventListener('resize', resize);
-resize();
-initMap();
-initEntities();
-updateResourceUI();
-    updateFogOfWar();
-    requestAnimationFrame(render);
-// ========== СИСТЕМА ОЧЕРЕДИ ДЕЙСТВИЙ (как в Dota) ==========
-class ActionQueue {
-    constructor() {
-        this.queue = [];      // Очередь действий
-        this.isBusy = false;  // Выполняется ли сейчас действие
-        this.shiftPressed = false; // Зажат ли Shift
-    }
-    
-    // Добавить действие в очередь
-    addAction(action, delay = 0) {
-        this.queue.push({ action, delay });
-        if (!this.isBusy) {
-            this.executeNext();
-        }
-    }
-    
-    // Выполнить следующее действие из очереди
-    executeNext() {
-        if (this.queue.length === 0) {
-            this.isBusy = false;
-            return;
-        }
-        
-        this.isBusy = true;
-        const { action, delay } = this.queue.shift();
-        
-        setTimeout(() => {
-            action();
-            this.executeNext(); // Переход к следующему действию
-        }, delay);
-    }
-    
-    // Очистить очередь (если игрок отдал новую команду без Shift)
-    clear() {
-        this.queue = [];
-        this.isBusy = false;
-    }
-    
-    // Проверить, нужно ли ставить в очередь или выполнить сразу
-    handleCommand(commandFn) {
-        if (this.shiftPressed) {
-            // Если зажат Shift - добавляем в очередь
-            this.addAction(commandFn);
-        } else {
-            // Иначе очищаем очередь и выполняем сразу
-            this.clear();
-            commandFn();
-        }
-    }
-}
-
-// Создаем глобальный экземпляр очереди
-const actionQueue = new ActionQueue();
-
-// Отслеживаем клавишу Shift
-window.addEventListener('keydown', (e) => {
-    if (e.key === 'Shift') {
-        actionQueue.shiftPressed = true;
-    }
-});
-
-window.addEventListener('keyup', (e) => {
-    if (e.key === 'Shift') {
-        actionQueue.shiftPressed = false;
-    }
-});
-class Inventory {
-    constructor(capacity) {
-        this.items = new Map(); // itemId -> количество
-        this.capacity = capacity;
-    }
-    
-    addItem(itemId, amount) {
-        // добавление с проверкой веса/объема
-    }
-    
-    craftRecipe(recipe) {
-        // проверка ингредиентов и создание предмета
-    }
-}
-
-// Рецепты крафта
-const recipes = {
-    'wooden_wall': { wood: 5, workAmount: 50 },
-    'stone_block': { stone: 10, workAmount: 100 },
-    'simple_meal': { meat: 10, vegetables: 10, workAmount: 20 }
-};
+            const chunk = state.map.chunks[
