@@ -27,9 +27,8 @@ const state = {
         fogOfWarEnabled: true
     },
     resources: {
-        wood: 0,
-        stone: 0,
-        berries: 0
+        silver: 1000,
+        stone: 0
     },
     entities: [],
     jobs: [],
@@ -47,14 +46,11 @@ const state = {
 // Tile Types
 const TILE_TYPES = {
     GRASS: { color: '#4a7c44', name: 'Grass', moveCost: 1 },
-    BERRY_BUSH: { color: '#388e3c', name: 'Berry Bush', solid: true, harvestable: 'berries' },
     SOIL: { color: '#5d4037', name: 'Soil', moveCost: 1.2 },
     WATER: { color: '#1976d2', name: 'Water', moveCost: 3 },
     DEEP_WATER: { color: '#0d47a1', name: 'Deep Water', solid: true },
     STONE: { color: '#757575', name: 'Stone', solid: true, harvestable: 'stone' },
     SAND: { color: '#c2b280', name: 'Sand', moveCost: 1.5 },
-    FOREST: { color: '#2d5a27', name: 'Forest', moveCost: 1.3 }, // Новый тип биома
-    TREE: { color: '#1b5e20', name: 'Tree', solid: true, harvestable: 'wood' },
     WALL: { color: '#424242', name: 'Wall', solid: true }
 };
 
@@ -110,9 +106,8 @@ const Noise = {
 Noise.init();
 
 function updateResourceUI() {
-    document.getElementById('wood-count').textContent = state.resources.wood;
+    document.getElementById('silver-count').textContent = state.resources.silver;
     document.getElementById('stone-count').textContent = state.resources.stone;
-    document.getElementById('berries-count').textContent = state.resources.berries || 0;
 }
 
 function updateCharacterMenu() {
@@ -175,22 +170,10 @@ function initMap() {
                     type = TILE_TYPES.STONE; // Mountain peaks
                 } else {
                     // Biomes based on moisture
-                    if (moisture > 0.75) {
-                        type = TILE_TYPES.FOREST; // Теперь это полноценный биом
-                    }
-                    else if (moisture > 0.44) type = TILE_TYPES.GRASS;
+                    if (moisture > 0.44) type = TILE_TYPES.GRASS;
                     else if (moisture > 0.37) type = TILE_TYPES.SOIL;
                     else type = TILE_TYPES.SAND; // Desert
                 }
-            }
-            
-            // После определения биома, расставляем объекты (деревья, кусты)
-            if (type === TILE_TYPES.FOREST) {
-                if (Math.random() < 0.25) type = TILE_TYPES.TREE;
-                else if (Math.random() < 0.05) type = TILE_TYPES.BERRY_BUSH;
-            } else if (type === TILE_TYPES.GRASS) {
-                if (Math.random() < 0.02) type = TILE_TYPES.TREE;
-                else if (Math.random() < 0.01) type = TILE_TYPES.BERRY_BUSH;
             }
             
             // Guarantee safe start area (center)
@@ -212,15 +195,13 @@ function initMap() {
     const chunksY = Math.ceil(state.map.height / state.map.chunkSize);
 
     // Count resources for debugging
-    let treeCount = 0;
     let stoneCount = 0;
     for (let y = 0; y < state.map.height; y++) {
         for (let x = 0; x < state.map.width; x++) {
-            if (state.map.tiles[y][x].type === TILE_TYPES.TREE) treeCount++;
             if (state.map.tiles[y][x].type === TILE_TYPES.STONE) stoneCount++;
         }
     }
-    console.log(`Map Generated: ${treeCount} Trees, ${stoneCount} Stone Ores`);
+    console.log(`Map Generated: ${stoneCount} Stone Ores`);
 
     for (let cy = 0; cy < chunksY; cy++) {
         const row = [];
@@ -305,27 +286,6 @@ function updateChunk(chunk) {
                         ctx.arc(lx * ts + ox, ly * ts + oy, 2.2, 0, Math.PI * 2);
                         ctx.fill();
                     }
-                } else if (tile.type === TILE_TYPES.FOREST) {
-                    // Визуальные детали для биома леса
-                    for (let i = 0; i < 4; i++) {
-                        const ox = (gx * 43 + i * 17) % (ts - 8) + 4;
-                        const oy = (gy * 47 + i * 19) % (ts - 8) + 4;
-                        ctx.fillStyle = 'rgba(20, 50, 20, 0.2)';
-                        ctx.beginPath();
-                        ctx.arc(lx * ts + ox, ly * ts + oy, 3, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                } else if (tile.type === TILE_TYPES.TREE) {
-                    ctx.fillStyle = '#4e342e';
-                    ctx.fillRect(lx * ts + ts * 0.4, ly * ts + ts * 0.6, ts * 0.2, ts * 0.3);
-                    ctx.fillStyle = '#2e7d32';
-                    ctx.beginPath();
-                    ctx.arc(lx * ts + ts * 0.5, ly * ts + ts * 0.45, ts * 0.3, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.fillStyle = '#388e3c';
-                    ctx.beginPath();
-                    ctx.arc(lx * ts + ts * 0.4, ly * ts + ts * 0.35, ts * 0.2, 0, Math.PI * 2);
-                    ctx.fill();
                 } else if (tile.type === TILE_TYPES.STONE) {
                     ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
                     for (let i = 0; i < 3; i++) {
@@ -646,10 +606,6 @@ window.addEventListener('mousedown', (e) => {
                     if (state.map.tiles[ty][tx].type !== TILE_TYPES.WALL) {
                         job = { type: 'build_wall', x: tx, y: ty, progress: 0, assigned: false };
                     }
-                } else if (state.currentOrder === 'chop') {
-                    if (state.map.tiles[ty][tx].type === TILE_TYPES.TREE || state.map.tiles[ty][tx].type === TILE_TYPES.BERRY_BUSH) {
-                        job = { type: 'chop', x: tx, y: ty, progress: 0, assigned: false };
-                    }
                 } else if (state.currentOrder === 'mine') {
                     if (state.map.tiles[ty][tx].type === TILE_TYPES.STONE) {
                         job = { type: 'mine', x: tx, y: ty, progress: 0, assigned: false };
@@ -700,15 +656,19 @@ window.addEventListener('mousedown', (e) => {
                 if (path) {
                     state.selectedEntity.path = path;
                     state.selectedEntity.target = path[0];
-                    state.selectedEntity.job = null;
                     state.selectedEntity.isManualMove = true;
-                    console.log(`Commanded ${state.selectedEntity.name} to ${tx}, ${ty} (Path: ${path.length} steps)`);
+                    state.selectedEntity.job = null; // Cancel current job if moving manually
                 }
             }
-            updateInspectPanel(state.selectedEntity);
-        } else {
-            // Clicked non-walkable area, deselect
-            deselectEntity();
+
+            // Also show radial menu at click position
+            const radialMenu = document.getElementById('radial-menu');
+            if (radialMenu) {
+                radialMenu.classList.remove('hidden');
+                radialMenu.style.left = `${e.clientX}px`;
+                radialMenu.style.top = `${e.clientY}px`;
+                state.lastClickPos = { x: e.clientX, y: e.clientY };
+            }
         }
     } else if (e.button === 0 && !state.currentOrder) {
         // Inspect & Select logic
@@ -930,11 +890,8 @@ function update() {
 
     // Update Entities
     state.entities.forEach(ent => {
-        // Freeze selected entity UNLESS it's a manual move command OR a job
-        if (state.selectedEntity === ent && !ent.isManualMove && !ent.job) return;
-
         // Find job if idle
-        if (!ent.job && !ent.target) {
+        if (!ent.job && !ent.target && (!ent.waypointQueue || ent.waypointQueue.length === 0)) {
             const availableJob = state.jobs.find(j => !j.assigned);
             if (availableJob) {
                 assignJobToEntity(ent, availableJob);
@@ -961,6 +918,17 @@ function update() {
                 } else {
                     ent.target = null;
                     ent.isManualMove = false;
+                    
+                    // Check for queued waypoints (fallback)
+                    if (ent.waypointQueue && ent.waypointQueue.length > 0) {
+                        const nextWP = ent.waypointQueue.shift();
+                        const path = findPath(ent.x, ent.y, Math.floor(nextWP.x), Math.floor(nextWP.y));
+                        if (path) {
+                            ent.path = path;
+                            ent.target = ent.path[0];
+                            ent.isManualMove = true;
+                        }
+                    }
                 }
             } else {
                 const tx = Math.floor(ent.x);
@@ -974,39 +942,19 @@ function update() {
                 ent.y += (dy / dist) * ent.speed * speedMult;
             }
         } else if (ent.job) {
-            // Working on job
-            ent.job.progress += 0.5;
-            if (ent.job.progress >= 100) {
-                const tx = ent.job.x;
-                const ty = ent.job.y;
 
-                if (ent.job.type === 'build_wall') {
-                    state.map.tiles[ty][tx].type = TILE_TYPES.WALL;
-                } else if (ent.job.type === 'chop') {
-                    const tile = state.map.tiles[ty][tx];
-                    if (tile.type === TILE_TYPES.BERRY_BUSH) {
-                        state.resources.berries += 15;
-                    } else {
-                        state.resources.wood += 20;
-                    }
-                    state.map.tiles[ty][tx].type = TILE_TYPES.GRASS;
-                } else if (ent.job.type === 'mine') {
-                    state.map.tiles[ty][tx].type = TILE_TYPES.GRASS;
-                    state.resources.stone += 20;
-                } else if (ent.job.type === 'destruct') {
-                    state.map.tiles[ty][tx].type = TILE_TYPES.GRASS;
-                }
-
-                markTileDirty(tx, ty);
-                state.jobs = state.jobs.filter(j => j !== ent.job);
-                ent.job = null;
-                ent.target = null;
-                ent.path = [];
-                updateResourceUI();
-            }
         } else {
-            // Idle movement
-            if (Math.random() < 0.01) {
+            // If idle and has queued waypoints, start moving to the first one
+            if (ent.waypointQueue && ent.waypointQueue.length > 0 && !state.keys['ShiftLeft'] && !state.keys['ShiftRight']) {
+                const nextWP = ent.waypointQueue.shift();
+                const path = findPath(ent.x, ent.y, Math.floor(nextWP.x), Math.floor(nextWP.y));
+                if (path) {
+                    ent.path = path;
+                    ent.target = ent.path[0];
+                    ent.isManualMove = true;
+                }
+            } else if (Math.random() < 0.01) {
+                // Idle movement
                 const tx = Math.floor(ent.x + (Math.random() * 10 - 5));
                 const ty = Math.floor(ent.y + (Math.random() * 10 - 5));
                 if (isWalkable(tx, ty)) {
@@ -1143,7 +1091,70 @@ function render() {
             ctx.beginPath();
             ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 2, 0, Math.PI * 2);
             ctx.stroke();
-        }
+
+            // Path visualization
+            if (ent.path && ent.path.length > 0) {
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 2 / state.camera.zoom;
+                ctx.setLineDash([5, 5]);
+                
+                // Start line from entity current position
+                ctx.moveTo(ent.x * state.map.tileSize, ent.y * state.map.tileSize);
+                
+                // Draw line through all path points
+                ent.path.forEach(point => {
+                    ctx.lineTo(point.x * state.map.tileSize, point.y * state.map.tileSize);
+                });
+                
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset dash
+
+                // Draw destination indicator (circle)
+                 const lastPoint = ent.path[ent.path.length - 1];
+                 ctx.beginPath();
+                 ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                 ctx.arc(lastPoint.x * state.map.tileSize, lastPoint.y * state.map.tileSize, state.map.tileSize / 4, 0, Math.PI * 2);
+                 ctx.fill();
+                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                 ctx.stroke();
+             }
+
+             // Waypoint Queue visualization
+             if (ent.waypointQueue && ent.waypointQueue.length > 0) {
+                 ctx.beginPath();
+                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                 ctx.lineWidth = 1 / state.camera.zoom;
+                 ctx.setLineDash([2, 4]);
+                 
+                 // Start from current target or entity position
+                 let lastX = ent.target ? ent.target.x : ent.x;
+                 let lastY = ent.target ? ent.target.y : ent.y;
+                 
+                 // If there's a path, start from the end of the path
+                 if (ent.path && ent.path.length > 0) {
+                     lastX = ent.path[ent.path.length - 1].x;
+                     lastY = ent.path[ent.path.length - 1].y;
+                 }
+                 
+                 ctx.moveTo(lastX * state.map.tileSize, lastY * state.map.tileSize);
+                 
+                 ent.waypointQueue.forEach(wp => {
+                     ctx.lineTo(wp.x * state.map.tileSize, wp.y * state.map.tileSize);
+                     // Small marker for each waypoint
+                     ctx.stroke(); // Draw line to waypoint
+                     ctx.beginPath();
+                     ctx.arc(wp.x * state.map.tileSize, wp.y * state.map.tileSize, 3 / state.camera.zoom, 0, Math.PI * 2);
+                     ctx.stroke();
+                     ctx.moveTo(wp.x * state.map.tileSize, wp.y * state.map.tileSize);
+                     ctx.beginPath();
+                     ctx.moveTo(wp.x * state.map.tileSize, wp.y * state.map.tileSize);
+                 });
+                 
+                 ctx.stroke();
+                 ctx.setLineDash([]);
+             }
+         }
 
         ctx.fillStyle = ent.color;
         ctx.beginPath();
