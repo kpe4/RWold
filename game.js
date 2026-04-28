@@ -58,8 +58,14 @@ const TILE_TYPES = {
     TREE: { color: '#1b5e20', name: 'Tree', solid: true, harvestable: 'wood' },
     WALL: { color: '#424242', name: 'Wall', solid: true }
 };
-
-// --- Simple Noise Generator (Perlin-like) ---
+const NEEDS_CONFIG = {
+    HUNGER_DRAIN_RATE: 0.15,        // Уменьшение голода в минуту (в процентах)
+    REST_DRAIN_RATE: 0.12,          // Уменьшение отдыха в минуту
+    HUNGER_THRESHOLD_HUNGRY: 50,     // Ниже 50% — голодный
+    HUNGER_THRESHOLD_STARVING: 20,   // Ниже 20% — истощён
+    REST_THRESHOLD_TIRED: 40,        // Ниже 40% — устал
+    REST_THRESHOLD_EXHAUSTED: 15     // Ниже 15% — изнеможение
+};
 const Noise = {
     p: new Uint8Array(512),
     init() {
@@ -114,6 +120,70 @@ function updateResourceUI() {
     document.getElementById('wood-count').textContent = state.resources.wood;
     document.getElementById('stone-count').textContent = state.resources.stone;
     document.getElementById('berries-count').textContent = state.resources.berries || 0;
+}
+// ========== СИСТЕМА НУЖД ==========
+function updateNeeds(ent, deltaMinutes) {
+    ent.needs.food -= NEEDS_CONFIG.HUNGER_DRAIN_RATE * deltaMinutes;
+    ent.needs.rest -= NEEDS_CONFIG.REST_DRAIN_RATE * deltaMinutes;
+    
+    ent.needs.food = Math.max(0, Math.min(100, ent.needs.food));
+    ent.needs.rest = Math.max(0, Math.min(100, ent.needs.rest));
+    
+    applyNeedEffects(ent);
+}
+
+function applyNeedEffects(ent) {
+    let speedModifier = 1.0;
+    let messages = [];
+    
+    if (ent.needs.food <= NEEDS_CONFIG.HUNGER_THRESHOLD_STARVING) {
+        speedModifier *= 0.5;
+        messages.push("истощён от голода");
+    } else if (ent.needs.food <= NEEDS_CONFIG.HUNGER_THRESHOLD_HUNGRY) {
+        speedModifier *= 0.7;
+        messages.push("голоден");
+    } else if (ent.needs.food >= 90) {
+        speedModifier *= 1.1;
+        messages.push("сыт");
+    }
+    
+    if (ent.needs.rest <= NEEDS_CONFIG.REST_THRESHOLD_EXHAUSTED) {
+        speedModifier *= 0.4;
+        messages.push("сильно устал");
+    } else if (ent.needs.rest <= NEEDS_CONFIG.REST_THRESHOLD_TIRED) {
+        speedModifier *= 0.65;
+        messages.push("устал");
+    } else if (ent.needs.rest >= 90) {
+        speedModifier *= 1.05;
+        messages.push("отдохнувший");
+    }
+    
+    ent.currentSpeedModifier = speedModifier;
+    ent.statusMessages = messages;
+}
+
+function getNeedStatus(ent) {
+    const statuses = [];
+    
+    if (ent.needs.food <= NEEDS_CONFIG.HUNGER_THRESHOLD_STARVING) statuses.push("⚠️ ИСТОЩЕНИЕ");
+    else if (ent.needs.food <= NEEDS_CONFIG.HUNGER_THRESHOLD_HUNGRY) statuses.push("🍽️ Голоден");
+    else if (ent.needs.food >= 90) statuses.push("✅ Сыт");
+    
+    if (ent.needs.rest <= NEEDS_CONFIG.REST_THRESHOLD_EXHAUSTED) statuses.push("😴 Сильная усталость");
+    else if (ent.needs.rest <= NEEDS_CONFIG.REST_THRESHOLD_TIRED) statuses.push("😫 Устал");
+    else if (ent.needs.rest >= 90) statuses.push("⚡ Отдохнул");
+    
+    return statuses.length > 0 ? statuses.join(", ") : "Нормально";
+}
+
+function restoreHunger(ent, amount) {
+    ent.needs.food = Math.min(100, ent.needs.food + amount);
+    addMessage(`${ent.name} поел и восстановил ${amount} еды`, 'success');
+}
+
+function restoreRest(ent, amount) {
+    ent.needs.rest = Math.min(100, ent.needs.rest + amount);
+    addMessage(`${ent.name} поспал и восстановил ${amount} энергии`, 'success');
 }
 // ========== СИСТЕМА СООБЩЕНИЙ ==========
 function addMessage(text, type = 'info') {
