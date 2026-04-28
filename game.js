@@ -41,6 +41,7 @@ const state = {
         speed: 1
     },
     currentOrder: null,
+    messages: [],
     selectedEntity: null
 };
 
