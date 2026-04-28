@@ -1264,3 +1264,24 @@ window.addEventListener('keyup', (e) => {
         actionQueue.shiftPressed = false;
     }
 });
+class Inventory {
+    constructor(capacity) {
+        this.items = new Map(); // itemId -> количество
+        this.capacity = capacity;
+    }
+    
+    addItem(itemId, amount) {
+        // добавление с проверкой веса/объема
+    }
+    
+    craftRecipe(recipe) {
+        // проверка ингредиентов и создание предмета
+    }
+}
+
+// Рецепты крафта
+const recipes = {
+    'wooden_wall': { wood: 5, workAmount: 50 },
+    'stone_block': { stone: 10, workAmount: 100 },
+    'simple_meal': { meat: 10, vegetables: 10, workAmount: 20 }
+};
