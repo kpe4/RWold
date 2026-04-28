@@ -1,6 +1,58 @@
 // RimWorld Clone - Core Game Engine
 
 const canvas = document.getElementById('gameCanvas');
+// ========== СИСТЕМА ОЧЕРЕДИ ДЕЙСТВИЙ (Shift-Queue) ==========
+class ActionQueue {
+    constructor() {
+        this.queue = [];
+        this.processing = false;
+        this.shiftPressed = false;
+    }
+    
+    addAction(action, delay = 200) {
+        this.queue.push({ action, delay });
+        if (!this.processing) {
+            this.processQueue();
+        }
+    }
+    
+    async processQueue() {
+        if (this.processing) return;
+        this.processing = true;
+        
+        while (this.queue.length > 0) {
+            const { action, delay } = this.queue.shift();
+            if (delay > 0) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+            action();
+        }
+        
+        this.processing = false;
+    }
+    
+    clear() {
+        this.queue = [];
+        this.processing = false;
+    }
+}
+
+const actionQueue = new ActionQueue();
+
+// Отслеживаем Shift
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Shift') {
+        actionQueue.shiftPressed = true;
+        console.log('🔧 Shift зажат');
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key === 'Shift') {
+        actionQueue.shiftPressed = false;
+        console.log('🔧 Shift отпущен');
+    }
+});
 const ctx = canvas.getContext('2d');
 
 // Game State
