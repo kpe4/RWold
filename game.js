@@ -1198,3 +1198,69 @@ initEntities();
 updateResourceUI();
     updateFogOfWar();
     requestAnimationFrame(render);
+// ========== СИСТЕМА ОЧЕРЕДИ ДЕЙСТВИЙ (как в Dota) ==========
+class ActionQueue {
+    constructor() {
+        this.queue = [];      // Очередь действий
+        this.isBusy = false;  // Выполняется ли сейчас действие
+        this.shiftPressed = false; // Зажат ли Shift
+    }
+    
+    // Добавить действие в очередь
+    addAction(action, delay = 0) {
+        this.queue.push({ action, delay });
+        if (!this.isBusy) {
+            this.executeNext();
+        }
+    }
+    
+    // Выполнить следующее действие из очереди
+    executeNext() {
+        if (this.queue.length === 0) {
+            this.isBusy = false;
+            return;
+        }
+        
+        this.isBusy = true;
+        const { action, delay } = this.queue.shift();
+        
+        setTimeout(() => {
+            action();
+            this.executeNext(); // Переход к следующему действию
+        }, delay);
+    }
+    
+    // Очистить очередь (если игрок отдал новую команду без Shift)
+    clear() {
+        this.queue = [];
+        this.isBusy = false;
+    }
+    
+    // Проверить, нужно ли ставить в очередь или выполнить сразу
+    handleCommand(commandFn) {
+        if (this.shiftPressed) {
+            // Если зажат Shift - добавляем в очередь
+            this.addAction(commandFn);
+        } else {
+            // Иначе очищаем очередь и выполняем сразу
+            this.clear();
+            commandFn();
+        }
+    }
+}
+
+// Создаем глобальный экземпляр очереди
+const actionQueue = new ActionQueue();
+
+// Отслеживаем клавишу Shift
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Shift') {
+        actionQueue.shiftPressed = true;
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key === 'Shift') {
+        actionQueue.shiftPressed = false;
+    }
+});
