@@ -6,8 +6,8 @@ const ctx = canvas.getContext('2d');
 // Game State
 const state = {
     camera: {
-        x: -8000, // Center on 250,250
-        y: -8000,
+        x: -1616, // Match entities at 50.5, 50.5
+        y: -1616,
         zoom: 1,
         isDragging: false,
         lastMouseX: 0,
@@ -53,6 +53,7 @@ const TILE_TYPES = {
     DEEP_WATER: { color: '#0d47a1', name: 'Deep Water', solid: true },
     STONE: { color: '#757575', name: 'Stone', solid: true, harvestable: 'stone' },
     SAND: { color: '#c2b280', name: 'Sand', moveCost: 1.5 },
+    FOREST: { color: '#2d5a27', name: 'Forest', moveCost: 1.3 }, // Новый тип биома
     TREE: { color: '#1b5e20', name: 'Tree', solid: true, harvestable: 'wood' },
     WALL: { color: '#424242', name: 'Wall', solid: true }
 };
@@ -141,8 +142,6 @@ function initMap() {
     state.map.explored = new Uint8Array(state.map.width * state.map.height);
     const seedX = Math.random() * 1000;
     const seedY = Math.random() * 1000;
-    const moistureSeedX = Math.random() * 1000;
-    const moistureSeedY = Math.random() * 1000;
 
     for (let y = 0; y < state.map.height; y++) {
         const row = [];
@@ -151,26 +150,25 @@ function initMap() {
             const ny = y + seedY;
 
             // 1. Continental Noise (very low frequency - the "macro" shape)
-            const continent = Noise.fbm(nx * 0.004, ny * 0.004, 3);
+            // Уменьшил частоту для более крупных масс (0.004 -> 0.003)
+            const continent = Noise.fbm(nx * 0.003, ny * 0.003, 3);
             
-            // 2. Detail Noise (higher frequency - the "roughness" for coasts and terrain)
+            // 2. Detail Noise
             const detail = Noise.fbm(nx * 0.02, ny * 0.02, 4);
             
-            // 3. Combined Elevation (80% macro shape + 20% detail for natural edges)
-            const elevation = (continent * 0.8 + detail * 0.2);
+            // 3. Combined Elevation
+            const elevation = (continent * 0.85 + detail * 0.15);
             
-            // 4. Moisture Noise (separate noise for biomes)
-            const moisture = Noise.fbm(nx * 0.015 + 2000, ny * 0.015 + 2000, 3);
+            // 4. Moisture Noise (уменьшил частоту для более крупных биомов)
+            const moisture = Noise.fbm(nx * 0.01 + 2000, ny * 0.01 + 2000, 3);
 
             let type;
             const sea_level = 0.42;
 
             if (elevation < sea_level) {
-                // Ocean
                 if (elevation < sea_level - 0.15) type = TILE_TYPES.DEEP_WATER;
                 else type = TILE_TYPES.WATER;
             } else {
-                // Land
                 if (elevation < sea_level + 0.02) {
                     type = TILE_TYPES.SAND; // Coastline
                 } else if (elevation > 0.82) {
@@ -178,15 +176,21 @@ function initMap() {
                 } else {
                     // Biomes based on moisture
                     if (moisture > 0.75) {
-                        const rand = Math.random();
-                        if (rand < 0.3) type = TILE_TYPES.TREE;
-                        else if (rand < 0.45) type = TILE_TYPES.BERRY_BUSH;
-                        else type = TILE_TYPES.GRASS;
+                        type = TILE_TYPES.FOREST; // Теперь это полноценный биом
                     }
                     else if (moisture > 0.44) type = TILE_TYPES.GRASS;
                     else if (moisture > 0.37) type = TILE_TYPES.SOIL;
                     else type = TILE_TYPES.SAND; // Desert
                 }
+            }
+            
+            // После определения биома, расставляем объекты (деревья, кусты)
+            if (type === TILE_TYPES.FOREST) {
+                if (Math.random() < 0.25) type = TILE_TYPES.TREE;
+                else if (Math.random() < 0.05) type = TILE_TYPES.BERRY_BUSH;
+            } else if (type === TILE_TYPES.GRASS) {
+                if (Math.random() < 0.02) type = TILE_TYPES.TREE;
+                else if (Math.random() < 0.01) type = TILE_TYPES.BERRY_BUSH;
             }
             
             // Guarantee safe start area (center)
@@ -234,6 +238,9 @@ function initMap() {
         }
         state.map.chunks.push(row);
     }
+
+    // Initial dirty mark for all chunks to apply blending
+    state.map.chunks.forEach(row => row.forEach(c => c.dirty = true));
 }
 
 function updateChunk(chunk) {
@@ -249,33 +256,24 @@ function updateChunk(chunk) {
             const gx = chunk.cx * size + lx;
             
             if (gy < state.map.height && gx < state.map.width) {
-                // Fog of War check
-                if (state.map.fogOfWarEnabled && state.map.explored[gy * state.map.width + gx] === 0) continue;
-
                 const tile = state.map.tiles[gy][gx];
                 ctx.fillStyle = tile.type.color;
                 ctx.fillRect(lx * ts, ly * ts, ts, ts);
 
                 // Add visual detail for special tiles
                 if (tile.type === TILE_TYPES.GRASS) {
-                    // Detailed grass blades
                     ctx.lineWidth = 1;
                     ctx.lineCap = 'round';
                     for (let i = 0; i < 6; i++) {
                         const ox = (gx * 13 + i * 9) % (ts - 6) + 3;
                         const oy = (gy * 17 + i * 13) % (ts - 6) + 6;
                         const h = 4 + (gx + gy + i) % 5;
-                        const angle = ((gx + gy + i) % 10 - 5) * 0.1; // Slight lean
-                        
-                        // Use a slightly lighter/yellowish green for highlights
+                        const angle = ((gx + gy + i) % 10 - 5) * 0.1;
                         ctx.strokeStyle = `rgba(160, 210, 100, ${0.4 + (i % 3) * 0.1})`;
-                        
                         ctx.beginPath();
                         ctx.moveTo(lx * ts + ox, ly * ts + oy);
                         ctx.lineTo(lx * ts + ox + angle * h, ly * ts + oy - h);
                         ctx.stroke();
-                        
-                        // Add a second tiny blade for a tuft effect
                         if (i % 2 === 0) {
                             ctx.beginPath();
                             ctx.moveTo(lx * ts + ox + 2, ly * ts + oy);
@@ -284,25 +282,21 @@ function updateChunk(chunk) {
                         }
                     }
                 } else if (tile.type === TILE_TYPES.SOIL) {
-                    // Small gray pebbles
                     for (let i = 0; i < 5; i++) {
                         const ox = (gx * 23 + i * 13) % (ts - 6) + 3;
                         const oy = (gy * 29 + i * 19) % (ts - 6) + 3;
-                        const size = 1 + (gx + gy + i) % 2;
+                        const s = 1 + (gx + gy + i) % 2;
                         const gray = 100 + (gx * i) % 50;
                         ctx.fillStyle = `rgba(${gray}, ${gray}, ${gray}, 0.6)`;
                         ctx.beginPath();
-                        ctx.arc(lx * ts + ox, ly * ts + oy, size, 0, Math.PI * 2);
+                        ctx.arc(lx * ts + ox, ly * ts + oy, s, 0, Math.PI * 2);
                         ctx.fill();
                     }
                 } else if (tile.type === TILE_TYPES.BERRY_BUSH) {
-                    // Berry Bush rendering (Dark green bush with red berries)
                     ctx.fillStyle = '#2e7d32'; 
                     ctx.beginPath();
                     ctx.arc(lx * ts + ts * 0.5, ly * ts + ts * 0.6, ts * 0.35, 0, Math.PI * 2);
                     ctx.fill();
-                    
-                    // Berries
                     ctx.fillStyle = '#e53935';
                     for (let i = 0; i < 6; i++) {
                         const ox = (gx * 31 + i * 13) % (ts - 10) + 5;
@@ -311,12 +305,19 @@ function updateChunk(chunk) {
                         ctx.arc(lx * ts + ox, ly * ts + oy, 2.2, 0, Math.PI * 2);
                         ctx.fill();
                     }
+                } else if (tile.type === TILE_TYPES.FOREST) {
+                    // Визуальные детали для биома леса
+                    for (let i = 0; i < 4; i++) {
+                        const ox = (gx * 43 + i * 17) % (ts - 8) + 4;
+                        const oy = (gy * 47 + i * 19) % (ts - 8) + 4;
+                        ctx.fillStyle = 'rgba(20, 50, 20, 0.2)';
+                        ctx.beginPath();
+                        ctx.arc(lx * ts + ox, ly * ts + oy, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 } else if (tile.type === TILE_TYPES.TREE) {
-                    // Big tree
-                    ctx.fillStyle = '#4e342e'; // Darker trunk
+                    ctx.fillStyle = '#4e342e';
                     ctx.fillRect(lx * ts + ts * 0.4, ly * ts + ts * 0.6, ts * 0.2, ts * 0.3);
-                    
-                    // Layered canopy
                     ctx.fillStyle = '#2e7d32';
                     ctx.beginPath();
                     ctx.arc(lx * ts + ts * 0.5, ly * ts + ts * 0.45, ts * 0.3, 0, Math.PI * 2);
@@ -326,7 +327,6 @@ function updateChunk(chunk) {
                     ctx.arc(lx * ts + ts * 0.4, ly * ts + ts * 0.35, ts * 0.2, 0, Math.PI * 2);
                     ctx.fill();
                 } else if (tile.type === TILE_TYPES.STONE) {
-                    // Stone texture
                     ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
                     for (let i = 0; i < 3; i++) {
                         const ox = (gx * 37 + i * 11) % (ts - 8) + 4;
@@ -351,28 +351,85 @@ function markTileDirty(tx, ty) {
     }
 }
 
-function updateFogOfWar() {
-    if (!state.map.explored) return;
-    state.entities.forEach(ent => {
-        const radius = state.map.visionRadius;
-        const startX = Math.max(0, Math.floor(ent.x - radius));
-        const endX = Math.min(state.map.width - 1, Math.floor(ent.x + radius));
-        const startY = Math.max(0, Math.floor(ent.y - radius));
-        const endY = Math.min(state.map.height - 1, Math.floor(ent.y + radius));
+function drawFogOfWar() {
+    const ts = state.map.tileSize;
+    const visionRadiusPx = state.map.visionRadius * ts * 2.0;
 
-        for (let y = startY; y <= endY; y++) {
-            for (let x = startX; x <= endX; x++) {
-                const distSq = Math.pow(x - ent.x, 2) + Math.pow(y - ent.y, 2);
-                if (distSq < radius * radius) {
-                    const idx = y * state.map.width + x;
-                    if (state.map.explored[idx] === 0) {
-                        state.map.explored[idx] = 1;
-                        markTileDirty(x, y);
-                    }
-                }
-            }
-        }
+    // Расчет интенсивности тумана (день/ночь) - Сделал переходы намного длиннее и плавнее
+    const currentTime = state.time.hour + state.time.minute / 60;
+    let fogIntensity = 0.9; 
+
+    if (currentTime >= 4 && currentTime < 9) {
+        // Утро: очень плавное рассеивание (5 часов)
+        const t = (currentTime - 4) / 5;
+        fogIntensity = 0.9 * (1 - t);
+    } else if (currentTime >= 9 && currentTime < 15) {
+        // День: тумана нет
+        fogIntensity = 0;
+    } else if (currentTime >= 15 && currentTime < 21) {
+        // Вечер: очень плавное сгущение (6 часов)
+        const t = (currentTime - 15) / 6;
+        fogIntensity = 0.9 * t;
+    } else {
+        // Ночь
+        fogIntensity = 0.9;
+    }
+
+    if (fogIntensity <= 0) return;
+
+    if (!state.fowCanvas) {
+        state.fowCanvas = document.createElement('canvas');
+        state.fowCtx = state.fowCanvas.getContext('2d', { alpha: true });
+    }
+
+    if (state.fowCanvas.width !== canvas.width || state.fowCanvas.height !== canvas.height) {
+        state.fowCanvas.width = canvas.width;
+        state.fowCanvas.height = canvas.height;
+    }
+
+    const fCtx = state.fowCtx;
+    fCtx.imageSmoothingEnabled = false; // Отключаем сглаживание для четкости при движении
+    
+    // Очищаем и заливаем
+    fCtx.globalCompositeOperation = 'source-over';
+    fCtx.clearRect(0, 0, canvas.width, canvas.height);
+    fCtx.fillStyle = `rgba(0, 0, 0, ${fogIntensity})`;
+    fCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Вырезаем свет
+    fCtx.globalCompositeOperation = 'destination-out';
+    
+    // Используем Math.floor для всех координат, чтобы избежать "шлейфа" из-за субпиксельного рендеринга
+    const camX = Math.floor(state.camera.x);
+    const camY = Math.floor(state.camera.y);
+    const centerX = Math.floor(canvas.width / 2);
+    const centerY = Math.floor(canvas.height / 2);
+
+    state.entities.forEach(ent => {
+        const screenX = Math.floor(ent.x * ts + camX) * state.camera.zoom + centerX;
+        const screenY = Math.floor(ent.y * ts + camY) * state.camera.zoom + centerY;
+        
+        const zoomRadius = Math.floor(visionRadiusPx * state.camera.zoom);
+        
+        const grad = fCtx.createRadialGradient(
+            screenX, screenY, 0,
+            screenX, screenY, zoomRadius
+        );
+        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        grad.addColorStop(0.6, 'rgba(255, 255, 255, 1)');
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        fCtx.fillStyle = grad;
+        fCtx.beginPath();
+        fCtx.arc(screenX, screenY, zoomRadius, 0, Math.PI * 2);
+        fCtx.fill();
     });
+
+    // Отрисовываем маску
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(state.fowCanvas, 0, 0);
+    ctx.restore();
 }
 
 function isWalkable(tx, ty) {
@@ -728,6 +785,43 @@ window.addEventListener('keydown', (e) => {
         toggleFogOfWar();
     } else if (e.code === 'KeyH') {
         toggleUI();
+    } else if (e.code === 'KeyP') {
+        toggleDebugTime();
+    }
+});
+
+function toggleDebugTime() {
+    const panel = document.getElementById('debug-time-panel');
+    panel.classList.toggle('hidden');
+    
+    // Sync slider with current time when opening
+    if (!panel.classList.contains('hidden')) {
+        const slider = document.getElementById('time-slider');
+        slider.value = state.time.hour * 60 + state.time.minute;
+        updateSliderDisplay();
+    }
+}
+
+function updateSliderDisplay() {
+    const slider = document.getElementById('time-slider');
+    const display = document.getElementById('slider-time-display');
+    const totalMinutes = parseInt(slider.value);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    display.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// Slider event listener
+document.addEventListener('DOMContentLoaded', () => {
+    const slider = document.getElementById('time-slider');
+    if (slider) {
+        slider.addEventListener('input', () => {
+            const totalMinutes = parseInt(slider.value);
+            state.time.hour = Math.floor(totalMinutes / 60);
+            state.time.minute = totalMinutes % 60;
+            updateSliderDisplay();
+            updateTimeUI();
+        });
     }
 });
 
@@ -819,7 +913,6 @@ function assignJobToEntity(ent, job) {
 
 // Update Game State
 function update() {
-    updateFogOfWar();
     // Update Time
     state.time.tick++;
     if (state.time.tick % 60 === 0) {
@@ -1011,6 +1104,9 @@ function render() {
         }
     }
 
+    // Fog of War
+    drawFogOfWar();
+
     // Draw Jobs (Blueprints)
     state.jobs.forEach(job => {
         if (job.type === 'build_wall') {
@@ -1168,7 +1264,6 @@ window.regenerateWorld = function() {
     state.camera.y = -(baseSpawnY * state.map.tileSize);
     
     updateCharacterMenu();
-    updateFogOfWar();
     console.log("World regenerated and camera centered on colonists");
 };
 
@@ -1196,5 +1291,4 @@ resize();
 initMap();
 initEntities();
 updateResourceUI();
-updateFogOfWar();
 requestAnimationFrame(render);
