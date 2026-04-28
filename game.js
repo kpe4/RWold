@@ -613,46 +613,60 @@ window.addEventListener('mousedown', (e) => {
             }
         }
     } else if (e.button === 0 && state.selectedEntity) {
-        // If an entity is already selected, left-click issues a move command
-        const worldPos = screenToWorld(e.clientX, e.clientY);
-        const tx = Math.floor(worldPos.x / state.map.tileSize);
-        const ty = Math.floor(worldPos.y / state.map.tileSize);
-        
-        // Check if we're clicking another entity to switch selection
-        const clickedEnt = state.entities.find(ent => {
-            const dx = ent.x - (worldPos.x / state.map.tileSize);
-            const dy = ent.y - (worldPos.y / state.map.tileSize);
-            return Math.sqrt(dx * dx + dy * dy) < 0.6;
-        });
+    // If an entity is already selected, left-click issues a move command
+    const worldPos = screenToWorld(e.clientX, e.clientY);
+    const tx = Math.floor(worldPos.x / state.map.tileSize);
+    const ty = Math.floor(worldPos.y / state.map.tileSize);
+    
+    // Check if we're clicking another entity to switch selection
+    const clickedEnt = state.entities.find(ent => {
+        const dx = ent.x - (worldPos.x / state.map.tileSize);
+        const dy = ent.y - (worldPos.y / state.map.tileSize);
+        return Math.sqrt(dx * dx + dy * dy) < 0.6;
+    });
 
-        if (clickedEnt && clickedEnt !== state.selectedEntity) {
-            // Switch selection
-            selectEntity(clickedEnt);
-        } else if (isWalkable(tx, ty)) {
-            // Move command
+    if (clickedEnt && clickedEnt !== state.selectedEntity) {
+        // Switch selection (всегда сразу, без очереди)
+        selectEntity(clickedEnt);
+    } else if (isWalkable(tx, ty)) {
+        // ★★★ НОВАЯ ЛОГИКА С ОЧЕРЕДЬЮ ★★★
+        const moveCommand = () => {
+            console.log(`▶️ Выполняю команду движения для ${state.selectedEntity.name} в ${tx},${ty}`);
+            
             if (isPathClearOfWater(state.selectedEntity.x, state.selectedEntity.y, tx, ty)) {
-                // Straight line if no water/obstacles
                 state.selectedEntity.path = [{ x: tx + 0.5, y: ty + 0.5 }];
                 state.selectedEntity.target = state.selectedEntity.path[0];
                 state.selectedEntity.job = null;
                 state.selectedEntity.isManualMove = true;
-                console.log(`Commanded ${state.selectedEntity.name} to ${tx}, ${ty} (Straight Line)`);
             } else {
-                // Use pathfinding if water is in the way
                 const path = findPath(state.selectedEntity.x, state.selectedEntity.y, tx, ty);
                 if (path) {
                     state.selectedEntity.path = path;
                     state.selectedEntity.target = path[0];
                     state.selectedEntity.job = null;
                     state.selectedEntity.isManualMove = true;
-                    console.log(`Commanded ${state.selectedEntity.name} to ${tx}, ${ty} (Path: ${path.length} steps)`);
                 }
             }
             updateInspectPanel(state.selectedEntity);
+        };
+        
+        // Используем очередь с проверкой Shift
+        if (actionQueue.shiftPressed) {
+            console.log(`📌 Добавляю в очередь: движение в ${tx},${ty}`);
+            actionQueue.addAction(moveCommand, 300);
         } else {
-            // Clicked non-walkable area, deselect
-            deselectEntity();
+            console.log(`⚡ Очищаю очередь и выполняю сразу: движение в ${tx},${ty}`);
+            actionQueue.clear();
+            // Останавливаем текущее движение персонажа
+            state.selectedEntity.path = [];
+            state.selectedEntity.target = null;
+            state.selectedEntity.job = null;
+            moveCommand();
         }
+    } else {
+        deselectEntity();
+    }
+}
     } else if (e.button === 0 && !state.currentOrder) {
         // Inspect & Select logic
         const worldPos = screenToWorld(e.clientX, e.clientY);
