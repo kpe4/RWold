@@ -664,47 +664,55 @@ window.addEventListener('mousedown', (e) => {
                 }
             }
         }
-    } else if (e.button === 0 && state.selectedEntity) {
-        // If an entity is already selected, left-click issues a move command
-        const worldPos = screenToWorld(e.clientX, e.clientY);
-        const tx = Math.floor(worldPos.x / state.map.tileSize);
-        const ty = Math.floor(worldPos.y / state.map.tileSize);
-        
-        // Check if we're clicking another entity to switch selection
-        const clickedEnt = state.entities.find(ent => {
-            const dx = ent.x - (worldPos.x / state.map.tileSize);
-            const dy = ent.y - (worldPos.y / state.map.tileSize);
-            return Math.sqrt(dx * dx + dy * dy) < 0.6;
-        });
+    } } else if (e.button === 0 && state.selectedEntity) {
+    const worldPos = screenToWorld(e.clientX, e.clientY);
+    const tx = Math.floor(worldPos.x / state.map.tileSize);
+    const ty = Math.floor(worldPos.y / state.map.tileSize);
+    
+    const clickedEnt = state.entities.find(ent => {
+        const dx = ent.x - (worldPos.x / state.map.tileSize);
+        const dy = ent.y - (worldPos.y / state.map.tileSize);
+        return Math.sqrt(dx * dx + dy * dy) < 0.6;
+    });
 
-        if (clickedEnt && clickedEnt !== state.selectedEntity) {
-            // Switch selection
-            selectEntity(clickedEnt);
-        } else if (isWalkable(tx, ty)) {
-            // Move command
-            if (isPathClearOfWater(state.selectedEntity.x, state.selectedEntity.y, tx, ty)) {
-                // Straight line if no water/obstacles
-                state.selectedEntity.path = [{ x: tx + 0.5, y: ty + 0.5 }];
-                state.selectedEntity.target = state.selectedEntity.path[0];
-                state.selectedEntity.job = null;
-                state.selectedEntity.isManualMove = true;
-                console.log(`Commanded ${state.selectedEntity.name} to ${tx}, ${ty} (Straight Line)`);
+    if (clickedEnt && clickedEnt !== state.selectedEntity) {
+        selectEntity(clickedEnt);
+    } else if (isWalkable(tx, ty)) {
+        // ★★★ НОВАЯ ЛОГИКА С ОЧЕРЕДЬЮ ★★★
+        const entity = state.selectedEntity;
+        const moveCommand = () => {
+            console.log(`▶️ ${entity.name} идёт в ${tx},${ty}`);
+            if (isPathClearOfWater(entity.x, entity.y, tx, ty)) {
+                entity.path = [{ x: tx + 0.5, y: ty + 0.5 }];
+                entity.target = entity.path[0];
+                entity.job = null;
+                entity.isManualMove = true;
             } else {
-                // Use pathfinding if water is in the way
-                const path = findPath(state.selectedEntity.x, state.selectedEntity.y, tx, ty);
+                const path = findPath(entity.x, entity.y, tx, ty);
                 if (path) {
-                    state.selectedEntity.path = path;
-                    state.selectedEntity.target = path[0];
-                    state.selectedEntity.job = null;
-                    state.selectedEntity.isManualMove = true;
-                    console.log(`Commanded ${state.selectedEntity.name} to ${tx}, ${ty} (Path: ${path.length} steps)`);
+                    entity.path = path;
+                    entity.target = path[0];
+                    entity.job = null;
+                    entity.isManualMove = true;
                 }
             }
-            updateInspectPanel(state.selectedEntity);
+            updateInspectPanel(entity);
+        };
+        
+        if (actionQueue.shiftPressed) {
+            console.log(`📌 Добавлено в очередь: ${tx},${ty}`);
+            actionQueue.addAction(moveCommand);
         } else {
-            // Clicked non-walkable area, deselect
-            deselectEntity();
+            console.log(`⚡ Очистка очереди и немедленное движение`);
+            actionQueue.clear();
+            entity.path = [];
+            entity.target = null;
+            moveCommand();
         }
+    } else {
+        deselectEntity();
+    }
+}
     } else if (e.button === 0 && !state.currentOrder) {
         // Inspect & Select logic
         const worldPos = screenToWorld(e.clientX, e.clientY);
