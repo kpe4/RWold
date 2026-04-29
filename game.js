@@ -40,7 +40,8 @@ const state = {
         speed: 1
     },
     currentOrder: null,
-    selectedEntity: null
+    selectedEntity: null,
+    keys: {}
 };
 
 // Tile Types
@@ -736,6 +737,7 @@ function screenToWorld(screenX, screenY) {
 }
 
 window.addEventListener('keydown', (e) => {
+    state.keys[e.code] = true;
     if (e.code === 'Space') {
         e.preventDefault(); // Prevent scrolling
         deselectEntity();
@@ -746,6 +748,10 @@ window.addEventListener('keydown', (e) => {
     } else if (e.code === 'KeyP') {
         toggleDebugTime();
     }
+});
+
+window.addEventListener('keyup', (e) => {
+    state.keys[e.code] = false;
 });
 
 function toggleDebugTime() {
@@ -871,6 +877,13 @@ function assignJobToEntity(ent, job) {
 
 // Update Game State
 function update() {
+    // Camera movement with WASD
+    const camSpeed = 10 / state.camera.zoom;
+    if (state.keys['KeyW']) state.camera.y += camSpeed;
+    if (state.keys['KeyS']) state.camera.y -= camSpeed;
+    if (state.keys['KeyA']) state.camera.x += camSpeed;
+    if (state.keys['KeyD']) state.camera.x -= camSpeed;
+
     // Update Time
     state.time.tick++;
     if (state.time.tick % 60 === 0) {
