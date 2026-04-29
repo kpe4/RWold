@@ -489,8 +489,6 @@ function findPath(startX, startY, endX, endY) {
     endY = Math.floor(endY);
 
     if (endX < 0 || endX >= state.map.width || endY < 0 || endY >= state.map.height) return null;
-    const destTile = state.map.tiles[endY][endX];
-    if (!isWalkable(endX, endY) && !destTile.type.harvestable) return null;
 
     const openSet = [{ x: startX, y: startY, g: 0, h: dist(startX, startY, endX, endY), f: 0, parent: null }];
     const closedSet = new Set();
@@ -942,7 +940,45 @@ function update() {
                 ent.y += (dy / dist) * ent.speed * speedMult;
             }
         } else if (ent.job) {
+            // Check if entity is at the job location
+            const dx = (ent.job.x + 0.5) - ent.x;
+            const dy = (ent.job.y + 0.5) - ent.y;
+            const distToJob = Math.sqrt(dx * dx + dy * dy);
 
+            if (distToJob < 0.2) {
+                // Work on the job
+                ent.job.progress += 0.5; // Progress speed
+                
+                if (ent.job.progress >= 100) {
+                    const job = ent.job;
+                    const tx = job.x;
+                    const ty = job.y;
+                    
+                    if (job.type === 'build_wall') {
+                        state.map.tiles[ty][tx].type = TILE_TYPES.WALL;
+                    } else if (job.type === 'mine') {
+                        state.map.tiles[ty][tx].type = TILE_TYPES.GRASS;
+                        state.resources.stone += 20;
+                        updateResourceUI();
+                    } else if (job.type === 'destruct') {
+                        state.map.tiles[ty][tx].type = TILE_TYPES.GRASS;
+                    }
+                    
+                    // Mark chunk as dirty to re-render
+                    const cx = Math.floor(tx / state.map.chunkSize);
+                    const cy = Math.floor(ty / state.map.chunkSize);
+                    state.map.chunks[cy][cx].dirty = true;
+                    
+                    // Finish job
+                    state.jobs = state.jobs.filter(j => j !== job);
+                    ent.job = null;
+                }
+            } else {
+                // Not at job location yet, try to move there
+                if (!ent.target) {
+                    assignJobToEntity(ent, ent.job);
+                }
+            }
         } else {
             // If idle and has queued waypoints, start moving to the first one
             if (ent.waypointQueue && ent.waypointQueue.length > 0 && !state.keys['ShiftLeft'] && !state.keys['ShiftRight']) {
