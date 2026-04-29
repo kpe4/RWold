@@ -40,7 +40,6 @@ const state = {
         speed: 1
     },
     currentOrder: null,
-    messages: [],
     selectedEntity: null
 };
 
@@ -54,14 +53,8 @@ const TILE_TYPES = {
     SAND: { color: '#c2b280', name: 'Sand', moveCost: 1.5 },
     WALL: { color: '#424242', name: 'Wall', solid: true }
 };
-const NEEDS_CONFIG = {
-    HUNGER_DRAIN_RATE: 0.15,        // Уменьшение голода в минуту (в процентах)
-    REST_DRAIN_RATE: 0.12,          // Уменьшение отдыха в минуту
-    HUNGER_THRESHOLD_HUNGRY: 50,     // Ниже 50% — голодный
-    HUNGER_THRESHOLD_STARVING: 20,   // Ниже 20% — истощён
-    REST_THRESHOLD_TIRED: 40,        // Ниже 40% — устал
-    REST_THRESHOLD_EXHAUSTED: 15     // Ниже 15% — изнеможение
-};
+
+// --- Simple Noise Generator (Perlin-like) ---
 const Noise = {
     p: new Uint8Array(512),
     init() {
@@ -116,121 +109,7 @@ function updateResourceUI() {
     document.getElementById('silver-count').textContent = state.resources.silver;
     document.getElementById('stone-count').textContent = state.resources.stone;
 }
-// ========== СИСТЕМА НУЖД ==========
-function updateNeeds(ent, deltaMinutes) {
-    ent.needs.food -= NEEDS_CONFIG.HUNGER_DRAIN_RATE * deltaMinutes;
-    ent.needs.rest -= NEEDS_CONFIG.REST_DRAIN_RATE * deltaMinutes;
-    
-    ent.needs.food = Math.max(0, Math.min(100, ent.needs.food));
-    ent.needs.rest = Math.max(0, Math.min(100, ent.needs.rest));
-    
-    applyNeedEffects(ent);
-}
 
-function applyNeedEffects(ent) {
-    let speedModifier = 1.0;
-    let messages = [];
-    
-    if (ent.needs.food <= NEEDS_CONFIG.HUNGER_THRESHOLD_STARVING) {
-        speedModifier *= 0.5;
-        messages.push("истощён от голода");
-    } else if (ent.needs.food <= NEEDS_CONFIG.HUNGER_THRESHOLD_HUNGRY) {
-        speedModifier *= 0.7;
-        messages.push("голоден");
-    } else if (ent.needs.food >= 90) {
-        speedModifier *= 1.1;
-        messages.push("сыт");
-    }
-    
-    if (ent.needs.rest <= NEEDS_CONFIG.REST_THRESHOLD_EXHAUSTED) {
-        speedModifier *= 0.4;
-        messages.push("сильно устал");
-    } else if (ent.needs.rest <= NEEDS_CONFIG.REST_THRESHOLD_TIRED) {
-        speedModifier *= 0.65;
-        messages.push("устал");
-    } else if (ent.needs.rest >= 90) {
-        speedModifier *= 1.05;
-        messages.push("отдохнувший");
-    }
-    
-    ent.currentSpeedModifier = speedModifier;
-    ent.statusMessages = messages;
-}
-
-function getNeedStatus(ent) {
-    const statuses = [];
-    
-    if (ent.needs.food <= NEEDS_CONFIG.HUNGER_THRESHOLD_STARVING) statuses.push("⚠️ ИСТОЩЕНИЕ");
-    else if (ent.needs.food <= NEEDS_CONFIG.HUNGER_THRESHOLD_HUNGRY) statuses.push("🍽️ Голоден");
-    else if (ent.needs.food >= 90) statuses.push("✅ Сыт");
-    
-    if (ent.needs.rest <= NEEDS_CONFIG.REST_THRESHOLD_EXHAUSTED) statuses.push("😴 Сильная усталость");
-    else if (ent.needs.rest <= NEEDS_CONFIG.REST_THRESHOLD_TIRED) statuses.push("😫 Устал");
-    else if (ent.needs.rest >= 90) statuses.push("⚡ Отдохнул");
-    
-    return statuses.length > 0 ? statuses.join(", ") : "Нормально";
-}
-
-function restoreHunger(ent, amount) {
-    ent.needs.food = Math.min(100, ent.needs.food + amount);
-    addMessage(`${ent.name} поел и восстановил ${amount} еды`, 'success');
-}
-
-function restoreRest(ent, amount) {
-    ent.needs.rest = Math.min(100, ent.needs.rest + amount);
-    addMessage(`${ent.name} поспал и восстановил ${amount} энергии`, 'success');
-}
-// ========== СИСТЕМА СООБЩЕНИЙ ==========
-function addMessage(text, type = 'info') {
-    // type: 'info', 'success', 'warning', 'error'
-    const message = {
-        id: Date.now() + Math.random(),
-        text: text,
-        type: type,
-        time: Date.now()
-    };
-    state.messages.push(message);
-    
-    // Удаляем старые сообщения (оставляем максимум 10)
-    if (state.messages.length > 10) {
-        state.messages.shift();
-    }
-    
-    // Обновляем отображение сообщений
-    updateMessageUI();
-}
-
-function updateMessageUI() {
-    const container = document.getElementById('message-log');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    // Показываем последние 6 сообщений
-    const recentMessages = state.messages.slice(-6);
-    
-    for (const msg of recentMessages) {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `message ${msg.type}`;
-        
-        // Форматируем время
-        const date = new Date(msg.time);
-        const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
-        
-        msgDiv.innerHTML = `<span class="msg-time">[${timeStr}]</span> <span class="msg-text">${msg.text}</span>`;
-        container.appendChild(msgDiv);
-    }
-    
-    // Автоскролл вниз
-    container.scrollTop = container.scrollHeight;
-}
-
-// Очистка старых сообщений каждую минуту (опционально)
-setInterval(() => {
-    const oneMinuteAgo = Date.now() - 60000;
-    state.messages = state.messages.filter(msg => msg.time > oneMinuteAgo);
-    updateMessageUI();
-}, 30000);
 function updateCharacterMenu() {
     const list = document.getElementById('character-list');
     if (!list) return;
@@ -573,9 +452,7 @@ function initEntities() {
         job: null,
         speed: 0.1,
         needs: { food: 100, rest: 100 },
-        path: [],
-        currentSpeedModifier: 1.0,
-        statusMessages: [] 
+        path: []
     });
     state.entities.push({
         id: 2,
@@ -587,9 +464,7 @@ function initEntities() {
         job: null,
         speed: 0.12,
         needs: { food: 100, rest: 100 },
-        path: [],
-        currentSpeedModifier: 1.0,
-        statusMessages: []
+        path: []
     });
     state.entities.push({
         id: 3,
@@ -601,9 +476,7 @@ function initEntities() {
         job: null,
         speed: 0.08,
         needs: { food: 100, rest: 100 },
-        path: [],
-        currentSpeedModifier: 1.0,
-        statusMessages: [] 
+        path: []
     });
     updateCharacterMenu();
 }
@@ -1013,27 +886,6 @@ function update() {
             }
         }
         updateTimeUI();
-                updateTimeUI();
-        
-        // Обновляем нужды всех персонажей (каждую минуту)
-        const deltaMinutes = 1;
-        state.entities.forEach(ent => {
-            updateNeeds(ent, deltaMinutes);
-        });
-    }  // ← ЭТА СКОБКА ЗАКРЫВАЕТ if (state.time.tick % 60 === 0)
-
-    // Update Entities
-    state.entities.forEach(ent => {
-        // Freeze selected entity UNLESS it's a manual move command OR a job
-        if (state.selectedEntity === ent && !ent.isManualMove && !ent.job) return;
-
-        // Find job if idle
-        if (!ent.job && !ent.target) {
-            const availableJob = state.jobs.find(j => !j.assigned);
-            if (availableJob) {
-                assignJobToEntity(ent, availableJob);
-            }
-        }
     }
 
     // Update Entities
