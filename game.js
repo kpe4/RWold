@@ -1053,6 +1053,27 @@ function update() {
             }
         }
         updateTimeUI();
+                updateTimeUI();
+        
+        // Обновляем нужды всех персонажей (каждую минуту)
+        const deltaMinutes = 1;
+        state.entities.forEach(ent => {
+            updateNeeds(ent, deltaMinutes);
+        });
+    }  // ← ЭТА СКОБКА ЗАКРЫВАЕТ if (state.time.tick % 60 === 0)
+
+    // Update Entities
+    state.entities.forEach(ent => {
+        // Freeze selected entity UNLESS it's a manual move command OR a job
+        if (state.selectedEntity === ent && !ent.isManualMove && !ent.job) return;
+
+        // Find job if idle
+        if (!ent.job && !ent.target) {
+            const availableJob = state.jobs.find(j => !j.assigned);
+            if (availableJob) {
+                assignJobToEntity(ent, availableJob);
+            }
+        }
     }
 
     // Update Entities
