@@ -1,9 +1,6 @@
-// RimWorld Clone - Core Game Engine
-
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Game State
 const state = {
     camera: {
         x: -1616, // Match entities at 50.5, 50.5
@@ -27,7 +24,7 @@ const state = {
         fogOfWarEnabled: true
     },
     resources: {
-        silver: 1000,
+        silver: 0,
         stone: 0
     },
     entities: [],
@@ -44,7 +41,7 @@ const state = {
     keys: {}
 };
 
-// Tile Types
+// тайлы
 const TILE_TYPES = {
     GRASS: { color: 'rgb(95, 94, 40)', name: 'Grass', moveCost: 1 },
     LIGHT_GRASS: { color: 'rgb(125, 124, 60)', name: 'Light Grass', moveCost: 1 },
@@ -57,7 +54,7 @@ const TILE_TYPES = {
     WALL: { color: '#424242', name: 'Wall', solid: true }
 };
 
-// --- Simple Noise Generator (Perlin-like) ---
+// генерация
 const Noise = {
     p: new Uint8Array(512),
     init() {
@@ -91,7 +88,7 @@ const Noise = {
                             this.lerp(u, this.grad(this.p[ab], x, y - 1),
                                      this.grad(this.p[bb], x - 1, y - 1)));
     },
-    // FBM (Fractal Brownian Motion) for more detail
+    
     fbm(x, y, octaves = 4) {
         let total = 0;
         let frequency = 1;
@@ -134,7 +131,7 @@ function updateCharacterMenu() {
     });
 }
 
-// Initialize Map
+// карта
 function initMap() {
     state.map.tiles = [];
     state.map.explored = new Uint8Array(state.map.width * state.map.height);
@@ -147,17 +144,16 @@ function initMap() {
             const nx = x + seedX;
             const ny = y + seedY;
 
-            // 1. Continental Noise (very low frequency - the "macro" shape)
-            // Уменьшил частоту для более крупных масс (0.004 -> 0.003)
+            
             const continent = Noise.fbm(nx * 0.003, ny * 0.003, 3);
             
-            // 2. Detail Noise
+            
             const detail = Noise.fbm(nx * 0.02, ny * 0.02, 4);
             
-            // 3. Combined Elevation
+            
             const elevation = (continent * 0.85 + detail * 0.15);
             
-            // 4. Moisture Noise (уменьшил частоту для более крупных биомов)
+            
             const moisture = Noise.fbm(nx * 0.01 + 2000, ny * 0.01 + 2000, 3);
 
             let type;
@@ -168,20 +164,20 @@ function initMap() {
                 else type = TILE_TYPES.WATER;
             } else {
                 if (elevation < sea_level + 0.02) {
-                    type = TILE_TYPES.SAND; // Coastline
+                    type = TILE_TYPES.SAND; 
                 } else if (elevation > 0.82) {
-                    type = TILE_TYPES.STONE; // Mountain peaks
+                    type = TILE_TYPES.STONE; 
                 } else {
-                    // Biomes based on moisture
+                    
                     if (moisture > 0.6) type = TILE_TYPES.DARK_GRASS;
                     else if (moisture > 0.44) type = TILE_TYPES.GRASS;
                     else if (moisture > 0.4) type = TILE_TYPES.LIGHT_GRASS;
                     else if (moisture > 0.37) type = TILE_TYPES.SOIL;
-                    else type = TILE_TYPES.SAND; // Desert
+                    else type = TILE_TYPES.SAND; 
                 }
             }
             
-            // Guarantee safe start area (center)
+            // старт с суши
             const distFromCenter = Math.sqrt(Math.pow(x - state.map.width / 2, 2) + Math.pow(y - state.map.height / 2, 2));
             if (distFromCenter < 5) {
                 if (type.solid || type === TILE_TYPES.WATER || type === TILE_TYPES.DEEP_WATER) {
@@ -194,12 +190,12 @@ function initMap() {
         state.map.tiles.push(row);
     }
 
-    // Initialize Chunks
+    // чанки
     state.map.chunks = [];
     const chunksX = Math.ceil(state.map.width / state.map.chunkSize);
     const chunksY = Math.ceil(state.map.height / state.map.chunkSize);
 
-    // Count resources for debugging
+    // дебаг
     let stoneCount = 0;
     for (let y = 0; y < state.map.height; y++) {
         for (let x = 0; x < state.map.width; x++) {
@@ -225,7 +221,7 @@ function initMap() {
         state.map.chunks.push(row);
     }
 
-    // Initial dirty mark for all chunks to apply blending
+    
     state.map.chunks.forEach(row => row.forEach(c => c.dirty = true));
 }
 
@@ -323,23 +319,18 @@ function drawFogOfWar() {
     const ts = state.map.tileSize;
     const visionRadiusPx = state.map.visionRadius * ts * 2.0;
 
-    // Расчет интенсивности тумана (день/ночь) - Сделал переходы намного длиннее и плавнее
     const currentTime = state.time.hour + state.time.minute / 60;
     let fogIntensity = 0.9; 
 
     if (currentTime >= 4 && currentTime < 9) {
-        // Утро: очень плавное рассеивание (5 часов)
         const t = (currentTime - 4) / 5;
         fogIntensity = 0.9 * (1 - t);
     } else if (currentTime >= 9 && currentTime < 15) {
-        // День: тумана нет
         fogIntensity = 0;
     } else if (currentTime >= 15 && currentTime < 21) {
-        // Вечер: очень плавное сгущение (6 часов)
         const t = (currentTime - 15) / 6;
         fogIntensity = 0.9 * t;
     } else {
-        // Ночь
         fogIntensity = 0.9;
     }
 
@@ -356,18 +347,15 @@ function drawFogOfWar() {
     }
 
     const fCtx = state.fowCtx;
-    fCtx.imageSmoothingEnabled = false; // Отключаем сглаживание для четкости при движении
+    fCtx.imageSmoothingEnabled = false;
     
-    // Очищаем и заливаем
     fCtx.globalCompositeOperation = 'source-over';
     fCtx.clearRect(0, 0, canvas.width, canvas.height);
     fCtx.fillStyle = `rgba(0, 0, 0, ${fogIntensity})`;
     fCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Вырезаем свет
     fCtx.globalCompositeOperation = 'destination-out';
     
-    // Используем Math.floor для всех координат, чтобы избежать "шлейфа" из-за субпиксельного рендеринга
     const camX = Math.floor(state.camera.x);
     const camY = Math.floor(state.camera.y);
     const centerX = Math.floor(canvas.width / 2);
@@ -393,7 +381,6 @@ function drawFogOfWar() {
         fCtx.fill();
     });
 
-    // Отрисовываем маску
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(state.fowCanvas, 0, 0);
@@ -404,10 +391,8 @@ function isWalkable(tx, ty) {
     if (tx < 0 || tx >= state.map.width || ty < 0 || ty >= state.map.height) return false;
     const tile = state.map.tiles[ty][tx];
     
-    // Solid tiles are never walkable
     if (tile.type.solid) return false;
     
-    // Water tiles are walkable only if they are "shallow" (next to land)
     if (tile.type === TILE_TYPES.WATER) {
         const neighbors = [
             {x: tx-1, y: ty}, {x: tx+1, y: ty},
@@ -436,11 +421,9 @@ function isPathClearOfWater(startX, startY, endX, endY) {
         
         if (x < 0 || x >= state.map.width || y < 0 || y >= state.map.height) return false;
         
-        // Skip check for the very last tile (destination) so we can walk to trees/rocks
         if (x === Math.floor(endX) && y === Math.floor(endY)) continue;
 
         const tile = state.map.tiles[y][x];
-        // If it's water (of any kind) or solid, the path is NOT clear
         if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER || tile.type.solid) {
             return false;
         }
@@ -448,7 +431,7 @@ function isPathClearOfWater(startX, startY, endX, endY) {
     return true;
 }
 
-// Initialize Colonists
+// колонисты
 function initEntities() {
     state.entities.push({
         id: 1,
@@ -489,7 +472,7 @@ function initEntities() {
     updateCharacterMenu();
 }
 
-// --- Pathfinding (A*) ---
+// путь
 function findPath(startX, startY, endX, endY) {
     startX = Math.floor(startX);
     startY = Math.floor(startY);
@@ -510,7 +493,6 @@ function findPath(startX, startY, endX, endY) {
 
     while (openSet.length > 0 && iterations < maxIterations) {
         iterations++;
-        // Get lowest f score
         let currentIdx = 0;
         for (let i = 1; i < openSet.length; i++) {
             if (openSet[i].f < openSet[currentIdx].f) currentIdx = i;
@@ -542,7 +524,6 @@ function findPath(startX, startY, endX, endY) {
             const isDest = neighbor.x === endX && neighbor.y === endY;
             if (!isWalkable(neighbor.x, neighbor.y) && !isDest) continue;
 
-            // Use move cost from tile type
             const tile = state.map.tiles[neighbor.y][neighbor.x];
             const cost = tile.type.moveCost || 1;
 
@@ -568,20 +549,17 @@ function findPath(startX, startY, endX, endY) {
         }
     }
 
-    return null; // No path found
+    return null; 
 }
 
-// Resize Canvas
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
 
-// Input Handling
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 
 window.addEventListener('mousedown', (e) => {
-    // Prevent clicking through UI
     if (e.target.closest('#top-bar') || 
         e.target.closest('#bottom-menu') || 
         e.target.closest('#inspect-panel') || 
@@ -624,7 +602,6 @@ window.addEventListener('mousedown', (e) => {
 
                 if (job) {
                     state.jobs.push(job);
-                    // If an entity is selected, assign it immediately
                     if (state.selectedEntity) {
                         assignJobToEntity(state.selectedEntity, job);
                     }
@@ -632,12 +609,10 @@ window.addEventListener('mousedown', (e) => {
             }
         }
     } else if (e.button === 0 && state.selectedEntity) {
-        // If an entity is already selected, left-click issues a move command
         const worldPos = screenToWorld(e.clientX, e.clientY);
         const tx = Math.floor(worldPos.x / state.map.tileSize);
         const ty = Math.floor(worldPos.y / state.map.tileSize);
         
-        // Check if we're clicking another entity to switch selection
         const clickedEnt = state.entities.find(ent => {
             const dx = ent.x - (worldPos.x / state.map.tileSize);
             const dy = ent.y - (worldPos.y / state.map.tileSize);
@@ -645,19 +620,15 @@ window.addEventListener('mousedown', (e) => {
         });
 
         if (clickedEnt && clickedEnt !== state.selectedEntity) {
-            // Switch selection
             selectEntity(clickedEnt);
         } else if (isWalkable(tx, ty)) {
-            // Move command
             if (isPathClearOfWater(state.selectedEntity.x, state.selectedEntity.y, tx, ty)) {
-                // Straight line if no water/obstacles
                 state.selectedEntity.path = [{ x: tx + 0.5, y: ty + 0.5 }];
                 state.selectedEntity.target = state.selectedEntity.path[0];
                 state.selectedEntity.job = null;
                 state.selectedEntity.isManualMove = true;
                 console.log(`Commanded ${state.selectedEntity.name} to ${tx}, ${ty} (Straight Line)`);
             } else {
-                // Use pathfinding if water is in the way
                 const path = findPath(state.selectedEntity.x, state.selectedEntity.y, tx, ty);
                 if (path) {
                     state.selectedEntity.path = path;
@@ -667,7 +638,6 @@ window.addEventListener('mousedown', (e) => {
                 }
             }
 
-            // Also show radial menu at click position
             const radialMenu = document.getElementById('radial-menu');
             if (radialMenu) {
                 radialMenu.classList.remove('hidden');
@@ -677,12 +647,11 @@ window.addEventListener('mousedown', (e) => {
             }
         }
     } else if (e.button === 0 && !state.currentOrder) {
-        // Inspect & Select logic
+
         const worldPos = screenToWorld(e.clientX, e.clientY);
         const tx = Math.floor(worldPos.x / state.map.tileSize);
         const ty = Math.floor(worldPos.y / state.map.tileSize);
         
-        // Check for entities first
         const clickedEnt = state.entities.find(ent => {
             const dx = ent.x - (worldPos.x / state.map.tileSize);
             const dy = ent.y - (worldPos.y / state.map.tileSize);
@@ -703,7 +672,7 @@ window.addEventListener('mousedown', (e) => {
 
 function selectEntity(ent) {
     state.selectedEntity = ent;
-    ent.isManualMove = false; // Reset manual move on new selection
+    ent.isManualMove = false; 
     updateInspectPanel(ent);
     updateCharacterMenu();
 }
@@ -746,7 +715,7 @@ function screenToWorld(screenX, screenY) {
 window.addEventListener('keydown', (e) => {
     state.keys[e.code] = true;
     if (e.code === 'Space') {
-        e.preventDefault(); // Prevent scrolling
+        e.preventDefault(); 
         deselectEntity();
     } else if (e.code === 'KeyL') {
         toggleFogOfWar();
@@ -765,7 +734,6 @@ function toggleDebugTime() {
     const panel = document.getElementById('debug-time-panel');
     panel.classList.toggle('hidden');
     
-    // Sync slider with current time when opening
     if (!panel.classList.contains('hidden')) {
         const slider = document.getElementById('time-slider');
         slider.value = state.time.hour * 60 + state.time.minute;
@@ -782,7 +750,6 @@ function updateSliderDisplay() {
     display.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-// Slider event listener
 document.addEventListener('DOMContentLoaded', () => {
     const slider = document.getElementById('time-slider');
     if (slider) {
@@ -804,7 +771,6 @@ function toggleUI() {
 
 function toggleFogOfWar() {
     state.map.fogOfWarEnabled = !state.map.fogOfWarEnabled;
-    // Mark all chunks as dirty to re-render with/without fog
     for (let cy = 0; cy < state.map.chunks.length; cy++) {
         for (let cx = 0; cx < state.map.chunks[cy].length; cx++) {
             state.map.chunks[cy][cx].dirty = true;
@@ -826,15 +792,11 @@ window.addEventListener('mousemove', (e) => {
 
 window.addEventListener('mouseup', (e) => {
     if (state.camera.isDragging && e.button === 2) {
-        // If it was a right-click drag, check if it was actually a click or a drag
         const dx = e.clientX - state.camera.dragStartX;
         const dy = e.clientY - state.camera.dragStartY;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // If moved less than 5 pixels, treat as a right-click
         if (dist < 5) {
-            // Right click now does nothing specific by default, 
-            // but we keep the detection logic in case we want right-click deselect or similar
         }
     }
     state.camera.isDragging = false;
@@ -843,13 +805,11 @@ window.addEventListener('mouseup', (e) => {
 window.addEventListener('wheel', (e) => {
     e.preventDefault();
     
-    // Smooth zoom factor
     const factor = e.deltaY > 0 ? 0.9 : 1.1;
     const oldZoom = state.camera.zoom;
     const newZoom = Math.max(0.1, Math.min(5, state.camera.zoom * factor));
     
     if (newZoom !== oldZoom) {
-        // Zoom towards mouse position
         const mouseWorldBefore = screenToWorld(e.clientX, e.clientY);
         state.camera.zoom = newZoom;
         const mouseWorldAfter = screenToWorld(e.clientX, e.clientY);
@@ -862,7 +822,6 @@ window.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 function assignJobToEntity(ent, job) {
-    // If entity already has a job, unassign it
     if (ent.job) {
         ent.job.assigned = false;
     }
@@ -882,9 +841,7 @@ function assignJobToEntity(ent, job) {
     }
 }
 
-// Update Game State
 function update() {
-    // Camera movement with WASD
     const camSpeed = 10 / state.camera.zoom;
     if (state.keys['KeyW']) state.camera.y += camSpeed;
     if (state.keys['KeyS']) state.camera.y -= camSpeed;
@@ -906,9 +863,8 @@ function update() {
         updateTimeUI();
     }
 
-    // Update Entities
     state.entities.forEach(ent => {
-        // Find job if idle
+  
         if (!ent.job && !ent.target && (!ent.waypointQueue || ent.waypointQueue.length === 0)) {
             const availableJob = state.jobs.find(j => !j.assigned);
             if (availableJob) {
@@ -924,9 +880,8 @@ function update() {
                 ent.x = ent.target.x;
                 ent.y = ent.target.y;
                 
-                // If there's a path, move to next waypoint
                 if (ent.path && ent.path.length > 0) {
-                    ent.path.shift(); // Remove current waypoint
+                    ent.path.shift(); 
                     if (ent.path.length > 0) {
                         ent.target = ent.path[0];
                     } else {
@@ -937,7 +892,6 @@ function update() {
                     ent.target = null;
                     ent.isManualMove = false;
                     
-                    // Check for queued waypoints (fallback)
                     if (ent.waypointQueue && ent.waypointQueue.length > 0) {
                         const nextWP = ent.waypointQueue.shift();
                         const path = findPath(ent.x, ent.y, Math.floor(nextWP.x), Math.floor(nextWP.y));
@@ -960,14 +914,12 @@ function update() {
                 ent.y += (dy / dist) * ent.speed * speedMult;
             }
         } else if (ent.job) {
-            // Check if entity is at the job location
             const dx = (ent.job.x + 0.5) - ent.x;
             const dy = (ent.job.y + 0.5) - ent.y;
             const distToJob = Math.sqrt(dx * dx + dy * dy);
 
             if (distToJob < 0.2) {
-                // Work on the job
-                ent.job.progress += 0.5; // Progress speed
+                ent.job.progress += 0.5; 
                 
                 if (ent.job.progress >= 100) {
                     const job = ent.job;
@@ -984,23 +936,19 @@ function update() {
                         state.map.tiles[ty][tx].type = TILE_TYPES.GRASS;
                     }
                     
-                    // Mark chunk as dirty to re-render
                     const cx = Math.floor(tx / state.map.chunkSize);
                     const cy = Math.floor(ty / state.map.chunkSize);
                     state.map.chunks[cy][cx].dirty = true;
                     
-                    // Finish job
                     state.jobs = state.jobs.filter(j => j !== job);
                     ent.job = null;
                 }
             } else {
-                // Not at job location yet, try to move there
                 if (!ent.target) {
                     assignJobToEntity(ent, ent.job);
                 }
             }
         } else {
-            // If idle and has queued waypoints, start moving to the first one
             if (ent.waypointQueue && ent.waypointQueue.length > 0 && !state.keys['ShiftLeft'] && !state.keys['ShiftRight']) {
                 const nextWP = ent.waypointQueue.shift();
                 const path = findPath(ent.x, ent.y, Math.floor(nextWP.x), Math.floor(nextWP.y));
@@ -1010,7 +958,6 @@ function update() {
                     ent.isManualMove = true;
                 }
             } else if (Math.random() < 0.01) {
-                // Idle movement
                 const tx = Math.floor(ent.x + (Math.random() * 10 - 5));
                 const ty = Math.floor(ent.y + (Math.random() * 10 - 5));
                 if (isWalkable(tx, ty)) {
@@ -1038,7 +985,6 @@ function updateTimeUI() {
     timeDisplay.innerText = `Day ${state.time.day}, ${h}:${m}`;
 }
 
-// Render Loop
 function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
@@ -1047,7 +993,6 @@ function render() {
     ctx.scale(state.camera.zoom, state.camera.zoom);
     ctx.translate(state.camera.x, state.camera.y);
 
-    // Draw Map (Chunks)
     const viewW = canvas.width / state.camera.zoom;
     const viewH = canvas.height / state.camera.zoom;
     const worldViewLeft = -state.camera.x - viewW / 2;
@@ -1067,7 +1012,6 @@ function render() {
         }
     }
 
-    // Ghost wall for architect mode
     if (state.currentOrder === 'architect') {
         const mouseWorld = screenToWorld(state.camera.lastMouseX, state.camera.lastMouseY);
         const tx = Math.floor(mouseWorld.x / state.map.tileSize);
@@ -1086,10 +1030,8 @@ function render() {
         }
     }
 
-    // Fog of War
     drawFogOfWar();
 
-    // Draw Jobs (Blueprints)
     state.jobs.forEach(job => {
         if (job.type === 'build_wall') {
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
@@ -1116,9 +1058,7 @@ function render() {
         }
     });
 
-    // Draw Entities
     state.entities.forEach(ent => {
-        // Selection circle
         if (state.selectedEntity === ent) {
             ctx.strokeStyle = '#81d4fa';
             ctx.lineWidth = 2 / state.camera.zoom;
@@ -1126,25 +1066,22 @@ function render() {
             ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 2, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Path visualization
             if (ent.path && ent.path.length > 0) {
                 ctx.beginPath();
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
                 ctx.lineWidth = 2 / state.camera.zoom;
                 ctx.setLineDash([5, 5]);
                 
-                // Start line from entity current position
                 ctx.moveTo(ent.x * state.map.tileSize, ent.y * state.map.tileSize);
                 
-                // Draw line through all path points
                 ent.path.forEach(point => {
                     ctx.lineTo(point.x * state.map.tileSize, point.y * state.map.tileSize);
                 });
                 
                 ctx.stroke();
-                ctx.setLineDash([]); // Reset dash
+                ctx.setLineDash([]); 
 
-                // Draw destination indicator (circle)
+
                  const lastPoint = ent.path[ent.path.length - 1];
                  ctx.beginPath();
                  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
@@ -1154,18 +1091,15 @@ function render() {
                  ctx.stroke();
              }
 
-             // Waypoint Queue visualization
              if (ent.waypointQueue && ent.waypointQueue.length > 0) {
                  ctx.beginPath();
                  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
                  ctx.lineWidth = 1 / state.camera.zoom;
                  ctx.setLineDash([2, 4]);
                  
-                 // Start from current target or entity position
                  let lastX = ent.target ? ent.target.x : ent.x;
                  let lastY = ent.target ? ent.target.y : ent.y;
                  
-                 // If there's a path, start from the end of the path
                  if (ent.path && ent.path.length > 0) {
                      lastX = ent.path[ent.path.length - 1].x;
                      lastY = ent.path[ent.path.length - 1].y;
@@ -1175,8 +1109,7 @@ function render() {
                  
                  ent.waypointQueue.forEach(wp => {
                      ctx.lineTo(wp.x * state.map.tileSize, wp.y * state.map.tileSize);
-                     // Small marker for each waypoint
-                     ctx.stroke(); // Draw line to waypoint
+                     ctx.stroke(); 
                      ctx.beginPath();
                      ctx.arc(wp.x * state.map.tileSize, wp.y * state.map.tileSize, 3 / state.camera.zoom, 0, Math.PI * 2);
                      ctx.stroke();
@@ -1195,41 +1128,41 @@ function render() {
         ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 3, 0, Math.PI * 2);
         ctx.fill();
         
-        // Name tag
+
         ctx.fillStyle = 'white';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(ent.name, ent.x * state.map.tileSize, ent.y * state.map.tileSize - 15);
     });
 
-    // Darkening at the edges of the world
-    const edgeSize = 1000; // Pixels from the edge where darkening starts
+
+    const edgeSize = 1000; 
     const mapW = state.map.width * state.map.tileSize;
     const mapH = state.map.height * state.map.tileSize;
 
     ctx.fillStyle = 'black';
-    // Left edge
+
     let grad = ctx.createLinearGradient(0, 0, edgeSize, 0);
     grad.addColorStop(0, 'rgba(0,0,0,0.8)');
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, edgeSize, mapH);
 
-    // Right edge
+
     grad = ctx.createLinearGradient(mapW - edgeSize, 0, mapW, 0);
     grad.addColorStop(0, 'rgba(0,0,0,0)');
     grad.addColorStop(1, 'rgba(0,0,0,0.8)');
     ctx.fillStyle = grad;
     ctx.fillRect(mapW - edgeSize, 0, edgeSize, mapH);
 
-    // Top edge
+
     grad = ctx.createLinearGradient(0, 0, 0, edgeSize);
     grad.addColorStop(0, 'rgba(0,0,0,0.8)');
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, mapW, edgeSize);
 
-    // Bottom edge
+
     grad = ctx.createLinearGradient(0, mapH - edgeSize, 0, mapH);
     grad.addColorStop(0, 'rgba(0,0,0,0)');
     grad.addColorStop(1, 'rgba(0,0,0,0.8)');
@@ -1238,7 +1171,7 @@ function render() {
 
     ctx.restore();
 
-    // Screen Vignette (Atmospheric)
+
     const vignette = ctx.createRadialGradient(
         canvas.width / 2, canvas.height / 2, 0,
         canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.7
@@ -1252,15 +1185,15 @@ function render() {
     requestAnimationFrame(render);
 }
 
-// Global functions for UI
+
 window.regenerateWorld = function() {
     initMap();
     
-    // Reset colonist positions to a valid land tile within 5 tiles of each other
+
     let baseSpawnX = state.map.width / 2;
     let baseSpawnY = state.map.height / 2;
     
-    // Find ALL valid land tiles
+
     const landTiles = [];
     for (let y = 0; y < state.map.height; y++) {
         for (let x = 0; x < state.map.width; x++) {
@@ -1283,7 +1216,7 @@ window.regenerateWorld = function() {
         let spawnX = baseSpawnX;
         let spawnY = baseSpawnY;
         
-        // Try to find a land tile within 5 tiles of the base spawn
+
         const nearbyLand = landTiles.filter(t => 
             Math.abs(t.x - baseSpawnX) <= 5 && 
             Math.abs(t.y - baseSpawnY) <= 5
@@ -1304,7 +1237,7 @@ window.regenerateWorld = function() {
     
     state.jobs = [];
     
-    // Center camera on the group
+
     state.camera.x = -(baseSpawnX * state.map.tileSize);
     state.camera.y = -(baseSpawnY * state.map.tileSize);
     
@@ -1319,7 +1252,7 @@ window.setOrder = function(type) {
         state.currentOrder = type;
     }
     
-    // Highlight active button
+
     const buttons = document.querySelectorAll('#bottom-menu button');
     buttons.forEach(btn => {
         if (btn.innerText.toLowerCase() === type) {
@@ -1330,7 +1263,7 @@ window.setOrder = function(type) {
     });
 };
 
-// Start Game
+
 window.addEventListener('resize', resize);
 resize();
 initMap();
