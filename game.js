@@ -169,9 +169,9 @@ function initMap() {
                     type = TILE_TYPES.STONE; 
                 } else {
                     
-                    if (moisture > 0.6) type = TILE_TYPES.DARK_GRASS;
+                    if (moisture > 0.6) type = TILE_TYPES.LIGHT_GRASS;
                     else if (moisture > 0.44) type = TILE_TYPES.GRASS;
-                    else if (moisture > 0.4) type = TILE_TYPES.LIGHT_GRASS;
+                    else if (moisture > 0.4) type = TILE_TYPES.DARK_GRASS;
                     else if (moisture > 0.37) type = TILE_TYPES.SOIL;
                     else type = TILE_TYPES.SAND; 
                 }
@@ -1135,51 +1135,7 @@ function render() {
         ctx.fillText(ent.name, ent.x * state.map.tileSize, ent.y * state.map.tileSize - 15);
     });
 
-
-    const edgeSize = 1000; 
-    const mapW = state.map.width * state.map.tileSize;
-    const mapH = state.map.height * state.map.tileSize;
-
-    ctx.fillStyle = 'black';
-
-    let grad = ctx.createLinearGradient(0, 0, edgeSize, 0);
-    grad.addColorStop(0, 'rgba(0,0,0,0.8)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, edgeSize, mapH);
-
-
-    grad = ctx.createLinearGradient(mapW - edgeSize, 0, mapW, 0);
-    grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.8)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(mapW - edgeSize, 0, edgeSize, mapH);
-
-
-    grad = ctx.createLinearGradient(0, 0, 0, edgeSize);
-    grad.addColorStop(0, 'rgba(0,0,0,0.8)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, mapW, edgeSize);
-
-
-    grad = ctx.createLinearGradient(0, mapH - edgeSize, 0, mapH);
-    grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.8)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, mapH - edgeSize, mapW, edgeSize);
-
     ctx.restore();
-
-
-    const vignette = ctx.createRadialGradient(
-        canvas.width / 2, canvas.height / 2, 0,
-        canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.7
-    );
-    vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(0,0,0,0.5)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     update();
     requestAnimationFrame(render);
