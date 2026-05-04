@@ -435,7 +435,7 @@ function isPathClearOfWater(startX, startY, endX, endY) {
 function initEntities() {
     state.entities.push({
         id: 1,
-        name: 'Yarec Burmaldec',
+        name: 'Makcum',
         x: 50.5,
         y: 50.5,
         color: '#ffcc80',
@@ -447,7 +447,7 @@ function initEntities() {
     });
     state.entities.push({
         id: 2,
-        name: 'Arcenec Burmaldec',
+        name: 'Arcen',
         x: 51.5,
         y: 50.5,
         color: '#f48fb1',
@@ -459,7 +459,7 @@ function initEntities() {
     });
     state.entities.push({
         id: 3,
-        name: 'Timurec Burmaldec',
+        name: 'Admin',
         x: 50.5,
         y: 51.5,
         color: '#90caf9',
