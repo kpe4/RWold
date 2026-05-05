@@ -185,11 +185,68 @@ function initMap() {
                 }
             }
             
-            row.push({ type, x, y });
+            row.push({ type, x, y, elevation });
         }
         state.map.tiles.push(row);
     }
 
+    // Вычисление расстояния до берега для воды
+    const waterTiles = [];
+    const queue = [];
+    
+    for (let y = 0; y < state.map.height; y++) {
+        for (let x = 0; x < state.map.width; x++) {
+            const tile = state.map.tiles[y][x];
+            if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER) {
+                // Проверяем, есть ли рядом суша
+                let isShore = false;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const ny = y + dy;
+                        const nx = x + dx;
+                        if (nx >= 0 && nx < state.map.width && ny >= 0 && ny < state.map.height) {
+                            const neighbor = state.map.tiles[ny][nx];
+                            if (neighbor.type !== TILE_TYPES.WATER && neighbor.type !== TILE_TYPES.DEEP_WATER) {
+                                isShore = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (isShore) break;
+                }
+                
+                if (isShore) {
+                    tile.shoreDist = 0;
+                    queue.push({x, y});
+                } else {
+                    tile.shoreDist = Infinity;
+                }
+            }
+        }
+    }
+    
+    // BFS для распространения расстояния
+    let head = 0;
+    while(head < queue.length) {
+        const p = queue[head++];
+        const currentDist = state.map.tiles[p.y][p.x].shoreDist;
+        
+        const dirs = [{dx:1, dy:0}, {dx:-1, dy:0}, {dx:0, dy:1}, {dx:0, dy:-1}];
+        for (const d of dirs) {
+            const nx = p.x + d.dx;
+            const ny = p.y + d.dy;
+            
+            if (nx >= 0 && nx < state.map.width && ny >= 0 && ny < state.map.height) {
+                const neighbor = state.map.tiles[ny][nx];
+                if ((neighbor.type === TILE_TYPES.WATER || neighbor.type === TILE_TYPES.DEEP_WATER) && 
+                    neighbor.shoreDist === Infinity) {
+                    neighbor.shoreDist = currentDist + 1;
+                    queue.push({x: nx, y: ny});
+                }
+            }
+        }
+    }
+    
     // чанки
     state.map.chunks = [];
     const chunksX = Math.ceil(state.map.width / state.map.chunkSize);
@@ -239,7 +296,27 @@ function updateChunk(chunk) {
             
             if (gy < state.map.height && gx < state.map.width) {
                 const tile = state.map.tiles[gy][gx];
-                ctx.fillStyle = tile.type.color;
+                
+                if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER) {
+                        const dist = tile.shoreDist || 0;
+                        
+                        if (dist < 3) {
+                            // Мелководье (теперь включает в себя бывшую береговую линию)
+                            ctx.fillStyle = '#29b6f6';
+                        } else if (dist < 8) {
+                            // Средняя глубина
+                            ctx.fillStyle = '#0288d1';
+                        } else if (dist < 20) {
+                            // Глубокая вода
+                            ctx.fillStyle = '#01579b';
+                        } else {
+                            // Океаническая бездна
+                            ctx.fillStyle = '#002f6c';
+                        }
+                     } else {
+                        ctx.fillStyle = tile.type.color;
+                    }
+                
                 ctx.fillRect(lx * ts, ly * ts, ts, ts);
 
                 // Add visual detail for special tiles
