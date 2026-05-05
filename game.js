@@ -38,7 +38,8 @@ const state = {
     },
     currentOrder: null,
     selectedEntity: null,
-    keys: {}
+    keys: {},
+    keyPressTime: {}
 };
 
 // тайлы
@@ -791,6 +792,10 @@ function screenToWorld(screenX, screenY) {
 
 window.addEventListener('keydown', (e) => {
     state.keys[e.code] = true;
+    if (!state.keyPressTime[e.code]) {
+        state.keyPressTime[e.code] = Date.now();
+    }
+    
     if (e.code === 'Space') {
         e.preventDefault(); 
         deselectEntity();
@@ -800,11 +805,25 @@ window.addEventListener('keydown', (e) => {
         toggleUI();
     } else if (e.code === 'KeyP') {
         toggleDebugTime();
+    } else if (e.code === 'KeyZ') {
+        setOrder('architect');
+    } else if (e.code === 'KeyX') {
+        setOrder('unarchitect');
+    } else if (e.code === 'KeyC') {
+        setOrder('chop');
     }
 });
 
 window.addEventListener('keyup', (e) => {
     state.keys[e.code] = false;
+    
+    if (e.code === 'KeyR' && state.keyPressTime[e.code]) {
+        const holdTime = Date.now() - state.keyPressTime[e.code];
+        if (holdTime >= 2000) {
+            regenerateWorld();
+        }
+        delete state.keyPressTime[e.code];
+    }
 });
 
 function toggleDebugTime() {
@@ -1285,10 +1304,18 @@ window.setOrder = function(type) {
         state.currentOrder = type;
     }
     
+    const orderNames = {
+        'architect': 'Architect',
+        'unarchitect': 'Destruct',
+        'chop': 'Chop',
+        'mine': 'Mine',
+        'work': 'Work'
+    };
 
     const buttons = document.querySelectorAll('#bottom-menu button');
     buttons.forEach(btn => {
-        if (btn.innerText.toLowerCase() === type) {
+        const btnText = btn.innerText;
+        if (orderNames[type] === btnText) {
             btn.style.background = state.currentOrder === type ? '#555' : '#333';
         } else {
             btn.style.background = '#333';
