@@ -536,7 +536,7 @@ function initEntities() {
     });
     state.entities.push({
         id: 3,
-        name: "Picun',
+        name: "Admin",
         x: 50.5,
         y: 51.5,
         color: '#90caf9',
