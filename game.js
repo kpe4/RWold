@@ -38,6 +38,14 @@ const state = {
     },
     currentOrder: null,
     selectedEntity: null,
+    selectedEntities: [],
+    selectionBox: {
+        active: false,
+        startX: 0,
+        startY: 0,
+        endX: 0,
+        endY: 0
+    },
     keys: {},
     keyPressTime: {}
 };
@@ -118,10 +126,14 @@ function updateCharacterMenu() {
     list.innerHTML = '';
     state.entities.forEach(ent => {
         const card = document.createElement('div');
-        card.className = `character-card ${state.selectedEntity === ent ? 'selected' : ''}`;
+        card.className = `character-card ${state.selectedEntities.includes(ent) ? 'selected' : ''}`;
         card.onclick = (e) => {
             e.stopPropagation();
-            selectEntity(ent);
+            if (e.ctrlKey || e.metaKey) {
+                toggleEntitySelection(ent);
+            } else {
+                selectEntity(ent);
+            }
         };
         
         card.innerHTML = `
@@ -680,52 +692,13 @@ window.addEventListener('mousedown', (e) => {
 
                 if (job) {
                     state.jobs.push(job);
-                    if (state.selectedEntity) {
-                        assignJobToEntity(state.selectedEntity, job);
-                    }
+                    state.selectedEntities.forEach(ent => {
+                        assignJobToEntity(ent, job);
+                    });
                 }
             }
         }
-    } else if (e.button === 0 && state.selectedEntity) {
-        const worldPos = screenToWorld(e.clientX, e.clientY);
-        const tx = Math.floor(worldPos.x / state.map.tileSize);
-        const ty = Math.floor(worldPos.y / state.map.tileSize);
-        
-        const clickedEnt = state.entities.find(ent => {
-            const dx = ent.x - (worldPos.x / state.map.tileSize);
-            const dy = ent.y - (worldPos.y / state.map.tileSize);
-            return Math.sqrt(dx * dx + dy * dy) < 0.6;
-        });
-
-        if (clickedEnt && clickedEnt !== state.selectedEntity) {
-            selectEntity(clickedEnt);
-        } else if (isWalkable(tx, ty)) {
-            if (isPathClearOfWater(state.selectedEntity.x, state.selectedEntity.y, tx, ty)) {
-                state.selectedEntity.path = [{ x: tx + 0.5, y: ty + 0.5 }];
-                state.selectedEntity.target = state.selectedEntity.path[0];
-                state.selectedEntity.job = null;
-                state.selectedEntity.isManualMove = true;
-                console.log(`Commanded ${state.selectedEntity.name} to ${tx}, ${ty} (Straight Line)`);
-            } else {
-                const path = findPath(state.selectedEntity.x, state.selectedEntity.y, tx, ty);
-                if (path) {
-                    state.selectedEntity.path = path;
-                    state.selectedEntity.target = path[0];
-                    state.selectedEntity.isManualMove = true;
-                    state.selectedEntity.job = null; // Cancel current job if moving manually
-                }
-            }
-
-            const radialMenu = document.getElementById('radial-menu');
-            if (radialMenu) {
-                radialMenu.classList.remove('hidden');
-                radialMenu.style.left = `${e.clientX}px`;
-                radialMenu.style.top = `${e.clientY}px`;
-                state.lastClickPos = { x: e.clientX, y: e.clientY };
-            }
-        }
-    } else if (e.button === 0 && !state.currentOrder) {
-
+    } else if (e.button === 0 && state.selectedEntities.length > 0) {
         const worldPos = screenToWorld(e.clientX, e.clientY);
         const tx = Math.floor(worldPos.x / state.map.tileSize);
         const ty = Math.floor(worldPos.y / state.map.tileSize);
@@ -737,19 +710,59 @@ window.addEventListener('mousedown', (e) => {
         });
 
         if (clickedEnt) {
-            selectEntity(clickedEnt);
-        } else if (tx >= 0 && tx < state.map.width && ty >= 0 && ty < state.map.height) {
-            state.selectedEntity = null;
-            const tile = state.map.tiles[ty][tx];
-            showInspectPanel(tile.type.name, `<p>Terrain: ${tile.type.name}</p><p>Coords: ${tx}, ${ty}</p>`);
+            if (e.ctrlKey || e.metaKey) {
+                toggleEntitySelection(clickedEnt);
+            } else {
+                selectEntity(clickedEnt);
+            }
+        } else if (isWalkable(tx, ty)) {
+            state.selectedEntities.forEach(ent => {
+                if (isPathClearOfWater(ent.x, ent.y, tx, ty)) {
+                    ent.path = [{ x: tx + 0.5, y: ty + 0.5 }];
+                    ent.target = ent.path[0];
+                    ent.job = null;
+                    ent.isManualMove = true;
+                } else {
+                    const path = findPath(ent.x, ent.y, tx, ty);
+                    if (path) {
+                        ent.path = path;
+                        ent.target = path[0];
+                        ent.isManualMove = true;
+                        ent.job = null;
+                    }
+                }
+            });
+        }
+    } else if (e.button === 0 && !state.currentOrder) {
+        const worldPos = screenToWorld(e.clientX, e.clientY);
+        const tx = Math.floor(worldPos.x / state.map.tileSize);
+        const ty = Math.floor(worldPos.y / state.map.tileSize);
+        
+        const clickedEnt = state.entities.find(ent => {
+            const dx = ent.x - (worldPos.x / state.map.tileSize);
+            const dy = ent.y - (worldPos.y / state.map.tileSize);
+            return Math.sqrt(dx * dx + dy * dy) < 0.6;
+        });
+
+        if (clickedEnt) {
+            if (e.ctrlKey || e.metaKey) {
+                toggleEntitySelection(clickedEnt);
+            } else {
+                selectEntity(clickedEnt);
+            }
         } else {
-            deselectEntity();
+            state.selectionBox.active = true;
+            state.selectionBox.startX = e.clientX;
+            state.selectionBox.startY = e.clientY;
+            state.selectionBox.endX = e.clientX;
+            state.selectionBox.endY = e.clientY;
         }
     }
 });
 
 function selectEntity(ent) {
     state.selectedEntity = ent;
+    state.selectedEntities = [ent];
     ent.isManualMove = false; 
     updateInspectPanel(ent);
     updateCharacterMenu();
@@ -757,8 +770,75 @@ function selectEntity(ent) {
 
 function deselectEntity() {
     state.selectedEntity = null;
+    state.selectedEntities = [];
     document.getElementById('inspect-panel').classList.add('hidden');
     updateCharacterMenu();
+}
+
+function toggleEntitySelection(ent) {
+    const index = state.selectedEntities.indexOf(ent);
+    if (index > -1) {
+        state.selectedEntities.splice(index, 1);
+        if (state.selectedEntity === ent) {
+            state.selectedEntity = state.selectedEntities.length > 0 ? state.selectedEntities[0] : null;
+        }
+    } else {
+        state.selectedEntities.push(ent);
+        if (!state.selectedEntity) {
+            state.selectedEntity = ent;
+        }
+    }
+    if (state.selectedEntity) {
+        updateInspectPanel(state.selectedEntity);
+    } else {
+        document.getElementById('inspect-panel').classList.add('hidden');
+    }
+    updateCharacterMenu();
+}
+
+function selectEntitiesInBox() {
+    const minX = Math.min(state.selectionBox.startX, state.selectionBox.endX);
+    const minY = Math.min(state.selectionBox.startY, state.selectionBox.endY);
+    const maxX = Math.max(state.selectionBox.startX, state.selectionBox.endX);
+    const maxY = Math.max(state.selectionBox.startY, state.selectionBox.endY);
+    
+    state.selectedEntities = [];
+    
+    state.entities.forEach(ent => {
+        const screenPos = worldToScreen(ent.x * state.map.tileSize, ent.y * state.map.tileSize);
+        if (screenPos.x >= minX && screenPos.x <= maxX && 
+            screenPos.y >= minY && screenPos.y <= maxY) {
+            state.selectedEntities.push(ent);
+        }
+    });
+    
+    if (state.selectedEntities.length > 0) {
+        state.selectedEntity = state.selectedEntities[0];
+        updateInspectPanel(state.selectedEntity);
+    } else {
+        state.selectedEntity = null;
+        document.getElementById('inspect-panel').classList.add('hidden');
+    }
+    updateCharacterMenu();
+}
+
+function selectAllEntities() {
+    if (state.selectedEntities.length === state.entities.length) {
+        deselectEntity();
+    } else {
+        state.selectedEntities = [...state.entities];
+        if (state.selectedEntities.length > 0) {
+            state.selectedEntity = state.selectedEntities[0];
+            updateInspectPanel(state.selectedEntity);
+        }
+        updateCharacterMenu();
+    }
+}
+
+function worldToScreen(worldX, worldY) {
+    const screenX = (worldX + state.camera.x) * state.camera.zoom + canvas.width / 2;
+    const screenY = (worldY + state.camera.y) * state.camera.zoom + canvas.height / 2;
+    return { x: screenX, y: screenY };
 }
 
 function updateInspectPanel(ent) {
@@ -811,6 +891,8 @@ window.addEventListener('keydown', (e) => {
         setOrder('unarchitect');
     } else if (e.code === 'KeyC') {
         setOrder('chop');
+    } else if (e.code === 'KeyT') {
+        selectAllEntities();
     }
 });
 
@@ -882,6 +964,12 @@ window.addEventListener('mousemove', (e) => {
         state.camera.x += dx / state.camera.zoom;
         state.camera.y += dy / state.camera.zoom;
     }
+    
+    if (state.selectionBox.active) {
+        state.selectionBox.endX = e.clientX;
+        state.selectionBox.endY = e.clientY;
+    }
+    
     state.camera.lastMouseX = e.clientX;
     state.camera.lastMouseY = e.clientY;
 });
@@ -895,6 +983,21 @@ window.addEventListener('mouseup', (e) => {
         if (dist < 5) {
         }
     }
+    
+    if (state.selectionBox.active && e.button === 0) {
+        state.selectionBox.endX = e.clientX;
+        state.selectionBox.endY = e.clientY;
+        
+        const boxWidth = Math.abs(state.selectionBox.endX - state.selectionBox.startX);
+        const boxHeight = Math.abs(state.selectionBox.endY - state.selectionBox.startY);
+        
+        if (boxWidth > 5 || boxHeight > 5) {
+            selectEntitiesInBox();
+        }
+        
+        state.selectionBox.active = false;
+    }
+    
     state.camera.isDragging = false;
 });
 
@@ -1155,7 +1258,7 @@ function render() {
     });
 
     state.entities.forEach(ent => {
-        if (state.selectedEntity === ent) {
+        if (state.selectedEntities.includes(ent)) {
             ctx.strokeStyle = '#81d4fa';
             ctx.lineWidth = 2 / state.camera.zoom;
             ctx.beginPath();
@@ -1230,6 +1333,27 @@ function render() {
         ctx.textAlign = 'center';
         ctx.fillText(ent.name, ent.x * state.map.tileSize, ent.y * state.map.tileSize - 15);
     });
+
+    if (state.selectionBox.active) {
+        ctx.restore();
+        const minX = Math.min(state.selectionBox.startX, state.selectionBox.endX);
+        const minY = Math.min(state.selectionBox.startY, state.selectionBox.endY);
+        const width = Math.abs(state.selectionBox.endX - state.selectionBox.startX);
+        const height = Math.abs(state.selectionBox.endY - state.selectionBox.startY);
+        
+        ctx.strokeStyle = '#81d4fa';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(minX, minY, width, height);
+        
+        ctx.fillStyle = 'rgba(129, 212, 250, 0.1)';
+        ctx.fillRect(minX, minY, width, height);
+        ctx.setLineDash([]);
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(state.camera.zoom, state.camera.zoom);
+        ctx.translate(state.camera.x, state.camera.y);
+    }
 
     ctx.restore();
 
