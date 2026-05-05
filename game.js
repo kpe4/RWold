@@ -280,6 +280,112 @@ function initMap() {
 
     
     state.map.chunks.forEach(row => row.forEach(c => c.dirty = true));
+
+    // Генерация примитивных "данжей" (заброшенных домиков)
+    generateDungeons();
+}
+
+function generateDungeons() {
+    const dungeonCount = Math.floor(Math.random() * 3) + 2; // 2-4 штуки
+    for (let i = 0; i < dungeonCount; i++) {
+        let spawned = false;
+        let attempts = 0;
+        
+        while (!spawned && attempts < 100) {
+            attempts++;
+            const houseWidth = Math.floor(Math.random() * 12) + 18; // 18-30
+            const houseHeight = Math.floor(Math.random() * 12) + 18; // 18-30
+            
+            const startX = Math.floor(Math.random() * (state.map.width - houseWidth - 10)) + 5;
+            const startY = Math.floor(Math.random() * (state.map.height - houseHeight - 10)) + 5;
+            
+            let canSpawn = true;
+            for (let hy = -1; hy < houseHeight + 1; hy++) {
+                for (let hx = -1; hx < houseWidth + 1; hx++) {
+                    const tx = startX + hx;
+                    const ty = startY + hy;
+                    const tile = state.map.tiles[ty][tx];
+                    if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER) {
+                        canSpawn = false;
+                        break;
+                    }
+                }
+                if (!canSpawn) break;
+            }
+            
+            if (canSpawn) {
+                // 1. Заполняем область полом и внешними стенами
+                for (let hy = 0; hy < houseHeight; hy++) {
+                    for (let hx = 0; hx < houseWidth; hx++) {
+                        const tx = startX + hx;
+                        const ty = startY + hy;
+                        if (hy === 0 || hy === houseHeight - 1 || hx === 0 || hx === houseWidth - 1) {
+                            state.map.tiles[ty][tx].type = TILE_TYPES.WALL;
+                        } else {
+                            state.map.tiles[ty][tx].type = TILE_TYPES.SOIL;
+                        }
+                    }
+                }
+
+                // 2. Рекурсивное деление на комнаты
+                const rooms = [{x: 1, y: 1, w: houseWidth - 2, h: houseHeight - 2}];
+                const finalRooms = [];
+                const minRoomSize = 5;
+
+                while (rooms.length > 0) {
+                    const room = rooms.pop();
+                    let splitHorizontal = room.h > room.w;
+                    if (room.w > minRoomSize * 2 || room.h > minRoomSize * 2) {
+                        if (room.w > minRoomSize * 2 && room.h > minRoomSize * 2) {
+                            splitHorizontal = Math.random() > 0.5;
+                        }
+
+                        if (splitHorizontal && room.h > minRoomSize * 2) {
+                            const splitY = Math.floor(Math.random() * (room.h - minRoomSize * 2)) + minRoomSize;
+                            // Рисуем стену
+                            for (let ix = 0; ix < room.w; ix++) {
+                                state.map.tiles[startY + room.y + splitY][startX + room.x + ix].type = TILE_TYPES.WALL;
+                            }
+                            // Проход
+                            const doorX = Math.floor(Math.random() * room.w);
+                            state.map.tiles[startY + room.y + splitY][startX + room.x + doorX].type = TILE_TYPES.SOIL;
+                            
+                            rooms.push({x: room.x, y: room.y, w: room.w, h: splitY});
+                            rooms.push({x: room.x, y: room.y + splitY + 1, w: room.w, h: room.h - splitY - 1});
+                        } else if (!splitHorizontal && room.w > minRoomSize * 2) {
+                            const splitX = Math.floor(Math.random() * (room.w - minRoomSize * 2)) + minRoomSize;
+                            // Рисуем стену
+                            for (let iy = 0; iy < room.h; iy++) {
+                                state.map.tiles[startY + room.y + iy][startX + room.x + splitX].type = TILE_TYPES.WALL;
+                            }
+                            // Проход
+                            const doorY = Math.floor(Math.random() * room.h);
+                            state.map.tiles[startY + room.y + doorY][startX + room.x + splitX].type = TILE_TYPES.SOIL;
+
+                            rooms.push({x: room.x, y: room.y, w: splitX, h: room.h});
+                            rooms.push({x: room.x + splitX + 1, y: room.y, w: room.w - splitX - 1, h: room.h});
+                        } else {
+                            finalRooms.push(room);
+                        }
+                    } else {
+                        finalRooms.push(room);
+                    }
+                }
+
+                // 3. Главный вход (хотя бы один гарантированно)
+                const sides = [
+                    {x: Math.floor(houseWidth/2), y: 0},
+                    {x: Math.floor(houseWidth/2), y: houseHeight-1},
+                    {x: 0, y: Math.floor(houseHeight/2)},
+                    {x: houseWidth-1, y: Math.floor(houseHeight/2)}
+                ];
+                const door = sides[Math.floor(Math.random() * sides.length)];
+                state.map.tiles[startY + door.y][startX + door.x].type = TILE_TYPES.SOIL;
+
+                spawned = true;
+            }
+        }
+    }
 }
 
 function updateChunk(chunk) {
