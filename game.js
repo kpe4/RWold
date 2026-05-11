@@ -24,7 +24,7 @@ const state = {
         fogOfWarEnabled: true
     },
     resources: {
-        silver: 1000,
+        silver: 0,
         stone: 0
     },
     entities: [],
@@ -37,11 +37,27 @@ const state = {
         speed: 1
     },
     currentOrder: null,
-    selectedEntity: null
+    selectedEntity: null,
+    selectedEntities: [],
+    selectionBox: {
+        active: false,
+        startX: 0,
+        startY: 0,
+        endX: 0,
+        endY: 0
+    },
+    keys: {},
+    keyPressTime: {}
 };
 
+<<<<<<< HEAD
+=======
+// тайлы
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 const TILE_TYPES = {
-    GRASS: { color: '#4a7c44', name: 'Grass', moveCost: 1 },
+    GRASS: { color: 'rgb(95, 94, 40)', name: 'Grass', moveCost: 1 },
+    LIGHT_GRASS: { color: 'rgb(125, 124, 60)', name: 'Light Grass', moveCost: 1 },
+    DARK_GRASS: { color: 'rgb(65, 64, 20)', name: 'Dark Grass', moveCost: 1.1 },
     SOIL: { color: '#5d4037', name: 'Soil', moveCost: 1.2 },
     WATER: { color: '#1976d2', name: 'Water', moveCost: 3 },
     DEEP_WATER: { color: '#0d47a1', name: 'Deep Water', solid: true },
@@ -50,6 +66,10 @@ const TILE_TYPES = {
     WALL: { color: '#424242', name: 'Wall', solid: true }
 };
 
+<<<<<<< HEAD
+=======
+// генерация
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 const Noise = {
     p: new Uint8Array(512),
     init() {
@@ -83,6 +103,10 @@ const Noise = {
                             this.lerp(u, this.grad(this.p[ab], x, y - 1),
                                      this.grad(this.p[bb], x - 1, y - 1)));
     },
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     fbm(x, y, octaves = 4) {
         let total = 0;
         let frequency = 1;
@@ -111,10 +135,14 @@ function updateCharacterMenu() {
     list.innerHTML = '';
     state.entities.forEach(ent => {
         const card = document.createElement('div');
-        card.className = `character-card ${state.selectedEntity === ent ? 'selected' : ''}`;
+        card.className = `character-card ${state.selectedEntities.includes(ent) ? 'selected' : ''}`;
         card.onclick = (e) => {
             e.stopPropagation();
-            selectEntity(ent);
+            if (e.ctrlKey || e.metaKey) {
+                toggleEntitySelection(ent);
+            } else {
+                selectEntity(ent);
+            }
         };
         
         card.innerHTML = `
@@ -125,6 +153,10 @@ function updateCharacterMenu() {
     });
 }
 
+<<<<<<< HEAD
+=======
+// карта
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 function initMap() {
     state.map.tiles = [];
     state.map.explored = new Uint8Array(state.map.width * state.map.height);
@@ -137,9 +169,22 @@ function initMap() {
             const nx = x + seedX;
             const ny = y + seedY;
 
+<<<<<<< HEAD
             const continent = Noise.fbm(nx * 0.003, ny * 0.003, 3);
             const detail = Noise.fbm(nx * 0.02, ny * 0.02, 4);
             const elevation = (continent * 0.85 + detail * 0.15);
+=======
+            
+            const continent = Noise.fbm(nx * 0.003, ny * 0.003, 3);
+            
+            
+            const detail = Noise.fbm(nx * 0.02, ny * 0.02, 4);
+            
+            
+            const elevation = (continent * 0.85 + detail * 0.15);
+            
+            
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
             const moisture = Noise.fbm(nx * 0.01 + 2000, ny * 0.01 + 2000, 3);
 
             let type;
@@ -150,6 +195,7 @@ function initMap() {
                 else type = TILE_TYPES.WATER;
             } else {
                 if (elevation < sea_level + 0.02) {
+<<<<<<< HEAD
                     type = TILE_TYPES.SAND;
                 } else if (elevation > 0.82) {
                     type = TILE_TYPES.STONE;
@@ -160,6 +206,22 @@ function initMap() {
                 }
             }
             
+=======
+                    type = TILE_TYPES.SAND; 
+                } else if (elevation > 0.82) {
+                    type = TILE_TYPES.STONE; 
+                } else {
+                    
+                    if (moisture > 0.6) type = TILE_TYPES.LIGHT_GRASS;
+                    else if (moisture > 0.44) type = TILE_TYPES.GRASS;
+                    else if (moisture > 0.4) type = TILE_TYPES.DARK_GRASS;
+                    else if (moisture > 0.37) type = TILE_TYPES.SOIL;
+                    else type = TILE_TYPES.SAND; 
+                }
+            }
+            
+            // старт с суши
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
             const distFromCenter = Math.sqrt(Math.pow(x - state.map.width / 2, 2) + Math.pow(y - state.map.height / 2, 2));
             if (distFromCenter < 5) {
                 if (type.solid || type === TILE_TYPES.WATER || type === TILE_TYPES.DEEP_WATER) {
@@ -167,15 +229,80 @@ function initMap() {
                 }
             }
             
-            row.push({ type, x, y });
+            row.push({ type, x, y, elevation });
         }
         state.map.tiles.push(row);
     }
 
+<<<<<<< HEAD
+=======
+    // Вычисление расстояния до берега для воды
+    const waterTiles = [];
+    const queue = [];
+    
+    for (let y = 0; y < state.map.height; y++) {
+        for (let x = 0; x < state.map.width; x++) {
+            const tile = state.map.tiles[y][x];
+            if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER) {
+                // Проверяем, есть ли рядом суша
+                let isShore = false;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const ny = y + dy;
+                        const nx = x + dx;
+                        if (nx >= 0 && nx < state.map.width && ny >= 0 && ny < state.map.height) {
+                            const neighbor = state.map.tiles[ny][nx];
+                            if (neighbor.type !== TILE_TYPES.WATER && neighbor.type !== TILE_TYPES.DEEP_WATER) {
+                                isShore = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (isShore) break;
+                }
+                
+                if (isShore) {
+                    tile.shoreDist = 0;
+                    queue.push({x, y});
+                } else {
+                    tile.shoreDist = Infinity;
+                }
+            }
+        }
+    }
+    
+    // BFS для распространения расстояния
+    let head = 0;
+    while(head < queue.length) {
+        const p = queue[head++];
+        const currentDist = state.map.tiles[p.y][p.x].shoreDist;
+        
+        const dirs = [{dx:1, dy:0}, {dx:-1, dy:0}, {dx:0, dy:1}, {dx:0, dy:-1}];
+        for (const d of dirs) {
+            const nx = p.x + d.dx;
+            const ny = p.y + d.dy;
+            
+            if (nx >= 0 && nx < state.map.width && ny >= 0 && ny < state.map.height) {
+                const neighbor = state.map.tiles[ny][nx];
+                if ((neighbor.type === TILE_TYPES.WATER || neighbor.type === TILE_TYPES.DEEP_WATER) && 
+                    neighbor.shoreDist === Infinity) {
+                    neighbor.shoreDist = currentDist + 1;
+                    queue.push({x: nx, y: ny});
+                }
+            }
+        }
+    }
+    
+    // чанки
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     state.map.chunks = [];
     const chunksX = Math.ceil(state.map.width / state.map.chunkSize);
     const chunksY = Math.ceil(state.map.height / state.map.chunkSize);
 
+<<<<<<< HEAD
+=======
+    // дебаг
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     let stoneCount = 0;
     for (let y = 0; y < state.map.height; y++) {
         for (let x = 0; x < state.map.width; x++) {
@@ -201,6 +328,10 @@ function initMap() {
         state.map.chunks.push(row);
     }
 
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     state.map.chunks.forEach(row => row.forEach(c => c.dirty = true));
 }
 
@@ -218,18 +349,46 @@ function updateChunk(chunk) {
             
             if (gy < state.map.height && gx < state.map.width) {
                 const tile = state.map.tiles[gy][gx];
-                ctx.fillStyle = tile.type.color;
+                
+                if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER) {
+                        const dist = tile.shoreDist || 0;
+                        
+                        if (dist < 3) {
+                            // Мелководье (теперь включает в себя бывшую береговую линию)
+                            ctx.fillStyle = '#29b6f6';
+                        } else if (dist < 8) {
+                            // Средняя глубина
+                            ctx.fillStyle = '#0288d1';
+                        } else if (dist < 20) {
+                            // Глубокая вода
+                            ctx.fillStyle = '#01579b';
+                        } else {
+                            // Океаническая бездна
+                            ctx.fillStyle = '#002f6c';
+                        }
+                     } else {
+                        ctx.fillStyle = tile.type.color;
+                    }
+                
                 ctx.fillRect(lx * ts, ly * ts, ts, ts);
 
+<<<<<<< HEAD
                 if (tile.type === TILE_TYPES.GRASS) {
+=======
+                // Add visual detail for special tiles
+                if (tile.type === TILE_TYPES.GRASS || tile.type === TILE_TYPES.LIGHT_GRASS || tile.type === TILE_TYPES.DARK_GRASS) {
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
                     ctx.lineWidth = 1;
                     ctx.lineCap = 'round';
+                    const grassColor = tile.type === TILE_TYPES.LIGHT_GRASS ? 'rgba(190, 240, 130,' : 
+                                      (tile.type === TILE_TYPES.DARK_GRASS ? 'rgba(120, 160, 80,' : 'rgba(160, 210, 100,');
+                    
                     for (let i = 0; i < 6; i++) {
                         const ox = (gx * 13 + i * 9) % (ts - 6) + 3;
                         const oy = (gy * 17 + i * 13) % (ts - 6) + 6;
                         const h = 4 + (gx + gy + i) % 5;
                         const angle = ((gx + gy + i) % 10 - 5) * 0.1;
-                        ctx.strokeStyle = `rgba(160, 210, 100, ${0.4 + (i % 3) * 0.1})`;
+                        ctx.strokeStyle = `${grassColor} ${0.4 + (i % 3) * 0.1})`;
                         ctx.beginPath();
                         ctx.moveTo(lx * ts + ox, ly * ts + oy);
                         ctx.lineTo(lx * ts + ox + angle * h, ly * ts + oy - h);
@@ -406,10 +565,14 @@ function isPathClearOfWater(startX, startY, endX, endY) {
     return true;
 }
 
+<<<<<<< HEAD
+=======
+// колонисты
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 function initEntities() {
     state.entities.push({
         id: 1,
-        name: 'Yarec Burmaldec',
+        name: 'Makcum',
         x: 50.5,
         y: 50.5,
         color: '#ffcc80',
@@ -421,7 +584,7 @@ function initEntities() {
     });
     state.entities.push({
         id: 2,
-        name: 'Arcenec Burmaldec',
+        name: 'Arcen',
         x: 51.5,
         y: 50.5,
         color: '#f48fb1',
@@ -433,7 +596,7 @@ function initEntities() {
     });
     state.entities.push({
         id: 3,
-        name: 'Timurec Burmaldec',
+        name: "Admin",
         x: 50.5,
         y: 51.5,
         color: '#90caf9',
@@ -446,6 +609,10 @@ function initEntities() {
     updateCharacterMenu();
 }
 
+<<<<<<< HEAD
+=======
+// путь
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 function findPath(startX, startY, endX, endY) {
     startX = Math.floor(startX);
     startY = Math.floor(startY);
@@ -453,8 +620,6 @@ function findPath(startX, startY, endX, endY) {
     endY = Math.floor(endY);
 
     if (endX < 0 || endX >= state.map.width || endY < 0 || endY >= state.map.height) return null;
-    const destTile = state.map.tiles[endY][endX];
-    if (!isWalkable(endX, endY) && !destTile.type.harvestable) return null;
 
     const openSet = [{ x: startX, y: startY, g: 0, h: dist(startX, startY, endX, endY), f: 0, parent: null }];
     const closedSet = new Set();
@@ -524,7 +689,11 @@ function findPath(startX, startY, endX, endY) {
         }
     }
 
+<<<<<<< HEAD
     return null;
+=======
+    return null; 
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 }
 
 function resize() {
@@ -577,6 +746,7 @@ window.addEventListener('mousedown', (e) => {
 
                 if (job) {
                     state.jobs.push(job);
+<<<<<<< HEAD
                     if (state.selectedEntity) {
                         assignJobToEntity(state.selectedEntity, job);
                     }
@@ -584,10 +754,20 @@ window.addEventListener('mousedown', (e) => {
             }
         }
     } else if (e.button === 0 && state.selectedEntity) {
+=======
+                    state.selectedEntities.forEach(ent => {
+                        assignJobToEntity(ent, job);
+                    });
+                }
+            }
+        }
+    } else if (e.button === 0 && state.selectedEntities.length > 0) {
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         const worldPos = screenToWorld(e.clientX, e.clientY);
         const tx = Math.floor(worldPos.x / state.map.tileSize);
         const ty = Math.floor(worldPos.y / state.map.tileSize);
         
+<<<<<<< HEAD
         const clickedEnt = state.entities.find(ent => {
             const dx = ent.x - (worldPos.x / state.map.tileSize);
             const dy = ent.y - (worldPos.y / state.map.tileSize);
@@ -626,6 +806,8 @@ window.addEventListener('mousedown', (e) => {
         const tx = Math.floor(worldPos.x / state.map.tileSize);
         const ty = Math.floor(worldPos.y / state.map.tileSize);
         
+=======
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         const clickedEnt = state.entities.find(ent => {
             const dx = ent.x - (worldPos.x / state.map.tileSize);
             const dy = ent.y - (worldPos.y / state.map.tileSize);
@@ -633,28 +815,139 @@ window.addEventListener('mousedown', (e) => {
         });
 
         if (clickedEnt) {
-            selectEntity(clickedEnt);
-        } else if (tx >= 0 && tx < state.map.width && ty >= 0 && ty < state.map.height) {
-            state.selectedEntity = null;
-            const tile = state.map.tiles[ty][tx];
-            showInspectPanel(tile.type.name, `<p>Terrain: ${tile.type.name}</p><p>Coords: ${tx}, ${ty}</p>`);
+            if (e.ctrlKey || e.metaKey) {
+                toggleEntitySelection(clickedEnt);
+            } else {
+                selectEntity(clickedEnt);
+            }
+        } else if (isWalkable(tx, ty)) {
+            state.selectedEntities.forEach(ent => {
+                if (isPathClearOfWater(ent.x, ent.y, tx, ty)) {
+                    ent.path = [{ x: tx + 0.5, y: ty + 0.5 }];
+                    ent.target = ent.path[0];
+                    ent.job = null;
+                    ent.isManualMove = true;
+                } else {
+                    const path = findPath(ent.x, ent.y, tx, ty);
+                    if (path) {
+                        ent.path = path;
+                        ent.target = path[0];
+                        ent.isManualMove = true;
+                        ent.job = null;
+                    }
+                }
+            });
+        }
+    } else if (e.button === 0 && !state.currentOrder) {
+        const worldPos = screenToWorld(e.clientX, e.clientY);
+        const tx = Math.floor(worldPos.x / state.map.tileSize);
+        const ty = Math.floor(worldPos.y / state.map.tileSize);
+        
+        const clickedEnt = state.entities.find(ent => {
+            const dx = ent.x - (worldPos.x / state.map.tileSize);
+            const dy = ent.y - (worldPos.y / state.map.tileSize);
+            return Math.sqrt(dx * dx + dy * dy) < 0.6;
+        });
+
+        if (clickedEnt) {
+            if (e.ctrlKey || e.metaKey) {
+                toggleEntitySelection(clickedEnt);
+            } else {
+                selectEntity(clickedEnt);
+            }
         } else {
-            deselectEntity();
+            state.selectionBox.active = true;
+            state.selectionBox.startX = e.clientX;
+            state.selectionBox.startY = e.clientY;
+            state.selectionBox.endX = e.clientX;
+            state.selectionBox.endY = e.clientY;
         }
     }
 });
 
 function selectEntity(ent) {
     state.selectedEntity = ent;
+<<<<<<< HEAD
     ent.isManualMove = false;
+=======
+    state.selectedEntities = [ent];
+    ent.isManualMove = false; 
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     updateInspectPanel(ent);
     updateCharacterMenu();
 }
 
 function deselectEntity() {
     state.selectedEntity = null;
+    state.selectedEntities = [];
     document.getElementById('inspect-panel').classList.add('hidden');
     updateCharacterMenu();
+}
+
+function toggleEntitySelection(ent) {
+    const index = state.selectedEntities.indexOf(ent);
+    if (index > -1) {
+        state.selectedEntities.splice(index, 1);
+        if (state.selectedEntity === ent) {
+            state.selectedEntity = state.selectedEntities.length > 0 ? state.selectedEntities[0] : null;
+        }
+    } else {
+        state.selectedEntities.push(ent);
+        if (!state.selectedEntity) {
+            state.selectedEntity = ent;
+        }
+    }
+    if (state.selectedEntity) {
+        updateInspectPanel(state.selectedEntity);
+    } else {
+        document.getElementById('inspect-panel').classList.add('hidden');
+    }
+    updateCharacterMenu();
+}
+
+function selectEntitiesInBox() {
+    const minX = Math.min(state.selectionBox.startX, state.selectionBox.endX);
+    const minY = Math.min(state.selectionBox.startY, state.selectionBox.endY);
+    const maxX = Math.max(state.selectionBox.startX, state.selectionBox.endX);
+    const maxY = Math.max(state.selectionBox.startY, state.selectionBox.endY);
+    
+    state.selectedEntities = [];
+    
+    state.entities.forEach(ent => {
+        const screenPos = worldToScreen(ent.x * state.map.tileSize, ent.y * state.map.tileSize);
+        if (screenPos.x >= minX && screenPos.x <= maxX && 
+            screenPos.y >= minY && screenPos.y <= maxY) {
+            state.selectedEntities.push(ent);
+        }
+    });
+    
+    if (state.selectedEntities.length > 0) {
+        state.selectedEntity = state.selectedEntities[0];
+        updateInspectPanel(state.selectedEntity);
+    } else {
+        state.selectedEntity = null;
+        document.getElementById('inspect-panel').classList.add('hidden');
+    }
+    updateCharacterMenu();
+}
+
+function selectAllEntities() {
+    if (state.selectedEntities.length === state.entities.length) {
+        deselectEntity();
+    } else {
+        state.selectedEntities = [...state.entities];
+        if (state.selectedEntities.length > 0) {
+            state.selectedEntity = state.selectedEntities[0];
+            updateInspectPanel(state.selectedEntity);
+        }
+        updateCharacterMenu();
+    }
+}
+
+function worldToScreen(worldX, worldY) {
+    const screenX = (worldX + state.camera.x) * state.camera.zoom + canvas.width / 2;
+    const screenY = (worldY + state.camera.y) * state.camera.zoom + canvas.height / 2;
+    return { x: screenX, y: screenY };
 }
 
 function updateInspectPanel(ent) {
@@ -687,8 +980,17 @@ function screenToWorld(screenX, screenY) {
 }
 
 window.addEventListener('keydown', (e) => {
+    state.keys[e.code] = true;
+    if (!state.keyPressTime[e.code]) {
+        state.keyPressTime[e.code] = Date.now();
+    }
+    
     if (e.code === 'Space') {
+<<<<<<< HEAD
         e.preventDefault();
+=======
+        e.preventDefault(); 
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         deselectEntity();
     } else if (e.code === 'KeyL') {
         toggleFogOfWar();
@@ -696,6 +998,26 @@ window.addEventListener('keydown', (e) => {
         toggleUI();
     } else if (e.code === 'KeyP') {
         toggleDebugTime();
+    } else if (e.code === 'KeyZ') {
+        setOrder('architect');
+    } else if (e.code === 'KeyX') {
+        setOrder('unarchitect');
+    } else if (e.code === 'KeyC') {
+        setOrder('chop');
+    } else if (e.code === 'KeyT') {
+        selectAllEntities();
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    state.keys[e.code] = false;
+    
+    if (e.code === 'KeyR' && state.keyPressTime[e.code]) {
+        const holdTime = Date.now() - state.keyPressTime[e.code];
+        if (holdTime >= 2000) {
+            regenerateWorld();
+        }
+        delete state.keyPressTime[e.code];
     }
 });
 
@@ -755,6 +1077,12 @@ window.addEventListener('mousemove', (e) => {
         state.camera.x += dx / state.camera.zoom;
         state.camera.y += dy / state.camera.zoom;
     }
+    
+    if (state.selectionBox.active) {
+        state.selectionBox.endX = e.clientX;
+        state.selectionBox.endY = e.clientY;
+    }
+    
     state.camera.lastMouseX = e.clientX;
     state.camera.lastMouseY = e.clientY;
 });
@@ -768,6 +1096,21 @@ window.addEventListener('mouseup', (e) => {
         if (dist < 5) {
         }
     }
+    
+    if (state.selectionBox.active && e.button === 0) {
+        state.selectionBox.endX = e.clientX;
+        state.selectionBox.endY = e.clientY;
+        
+        const boxWidth = Math.abs(state.selectionBox.endX - state.selectionBox.startX);
+        const boxHeight = Math.abs(state.selectionBox.endY - state.selectionBox.startY);
+        
+        if (boxWidth > 5 || boxHeight > 5) {
+            selectEntitiesInBox();
+        }
+        
+        state.selectionBox.active = false;
+    }
+    
     state.camera.isDragging = false;
 });
 
@@ -811,6 +1154,16 @@ function assignJobToEntity(ent, job) {
 }
 
 function update() {
+<<<<<<< HEAD
+=======
+    const camSpeed = 10 / state.camera.zoom;
+    if (state.keys['KeyW']) state.camera.y += camSpeed;
+    if (state.keys['KeyS']) state.camera.y -= camSpeed;
+    if (state.keys['KeyA']) state.camera.x += camSpeed;
+    if (state.keys['KeyD']) state.camera.x -= camSpeed;
+
+    // Update Time
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     state.time.tick++;
     if (state.time.tick % 60 === 0) {
         state.time.minute++;
@@ -826,6 +1179,10 @@ function update() {
     }
 
     state.entities.forEach(ent => {
+<<<<<<< HEAD
+=======
+  
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         if (!ent.job && !ent.target && (!ent.waypointQueue || ent.waypointQueue.length === 0)) {
             const availableJob = state.jobs.find(j => !j.assigned);
             if (availableJob) {
@@ -842,7 +1199,11 @@ function update() {
                 ent.y = ent.target.y;
                 
                 if (ent.path && ent.path.length > 0) {
+<<<<<<< HEAD
                     ent.path.shift();
+=======
+                    ent.path.shift(); 
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
                     if (ent.path.length > 0) {
                         ent.target = ent.path[0];
                     } else {
@@ -875,7 +1236,40 @@ function update() {
                 ent.y += (dy / dist) * ent.speed * speedMult;
             }
         } else if (ent.job) {
+            const dx = (ent.job.x + 0.5) - ent.x;
+            const dy = (ent.job.y + 0.5) - ent.y;
+            const distToJob = Math.sqrt(dx * dx + dy * dy);
 
+            if (distToJob < 0.2) {
+                ent.job.progress += 0.5; 
+                
+                if (ent.job.progress >= 100) {
+                    const job = ent.job;
+                    const tx = job.x;
+                    const ty = job.y;
+                    
+                    if (job.type === 'build_wall') {
+                        state.map.tiles[ty][tx].type = TILE_TYPES.WALL;
+                    } else if (job.type === 'mine') {
+                        state.map.tiles[ty][tx].type = TILE_TYPES.GRASS;
+                        state.resources.stone += 20;
+                        updateResourceUI();
+                    } else if (job.type === 'destruct') {
+                        state.map.tiles[ty][tx].type = TILE_TYPES.GRASS;
+                    }
+                    
+                    const cx = Math.floor(tx / state.map.chunkSize);
+                    const cy = Math.floor(ty / state.map.chunkSize);
+                    state.map.chunks[cy][cx].dirty = true;
+                    
+                    state.jobs = state.jobs.filter(j => j !== job);
+                    ent.job = null;
+                }
+            } else {
+                if (!ent.target) {
+                    assignJobToEntity(ent, ent.job);
+                }
+            }
         } else {
             if (ent.waypointQueue && ent.waypointQueue.length > 0 && !state.keys['ShiftLeft'] && !state.keys['ShiftRight']) {
                 const nextWP = ent.waypointQueue.shift();
@@ -941,6 +1335,7 @@ function render() {
         }
     }
 
+<<<<<<< HEAD
     if (state.camera.zoom > 0.5) {
         ctx.strokeStyle = 'rgba(0,0,0,0.1)';
         ctx.lineWidth = 1 / state.camera.zoom;
@@ -962,6 +1357,8 @@ function render() {
         ctx.stroke();
     }
 
+=======
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     if (state.currentOrder === 'architect') {
         const mouseWorld = screenToWorld(state.camera.lastMouseX, state.camera.lastMouseY);
         const tx = Math.floor(mouseWorld.x / state.map.tileSize);
@@ -1009,7 +1406,11 @@ function render() {
     });
 
     state.entities.forEach(ent => {
+<<<<<<< HEAD
         if (state.selectedEntity === ent) {
+=======
+        if (state.selectedEntities.includes(ent)) {
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
             ctx.strokeStyle = '#81d4fa';
             ctx.lineWidth = 2 / state.camera.zoom;
             ctx.beginPath();
@@ -1029,7 +1430,12 @@ function render() {
                 });
                 
                 ctx.stroke();
+<<<<<<< HEAD
                 ctx.setLineDash([]);
+=======
+                ctx.setLineDash([]); 
+
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 
                  const lastPoint = ent.path[ent.path.length - 1];
                  ctx.beginPath();
@@ -1058,7 +1464,11 @@ function render() {
                  
                  ent.waypointQueue.forEach(wp => {
                      ctx.lineTo(wp.x * state.map.tileSize, wp.y * state.map.tileSize);
+<<<<<<< HEAD
                      ctx.stroke();
+=======
+                     ctx.stroke(); 
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
                      ctx.beginPath();
                      ctx.arc(wp.x * state.map.tileSize, wp.y * state.map.tileSize, 3 / state.camera.zoom, 0, Math.PI * 2);
                      ctx.stroke();
@@ -1077,12 +1487,17 @@ function render() {
         ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 3, 0, Math.PI * 2);
         ctx.fill();
         
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         ctx.fillStyle = 'white';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(ent.name, ent.x * state.map.tileSize, ent.y * state.map.tileSize - 15);
     });
 
+<<<<<<< HEAD
     const edgeSize = 1000;
     const mapW = state.map.width * state.map.tileSize;
     const mapH = state.map.height * state.map.tileSize;
@@ -1123,16 +1538,53 @@ function render() {
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+=======
+    if (state.selectionBox.active) {
+        ctx.restore();
+        const minX = Math.min(state.selectionBox.startX, state.selectionBox.endX);
+        const minY = Math.min(state.selectionBox.startY, state.selectionBox.endY);
+        const width = Math.abs(state.selectionBox.endX - state.selectionBox.startX);
+        const height = Math.abs(state.selectionBox.endY - state.selectionBox.startY);
+        
+        ctx.strokeStyle = '#81d4fa';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(minX, minY, width, height);
+        
+        ctx.fillStyle = 'rgba(129, 212, 250, 0.1)';
+        ctx.fillRect(minX, minY, width, height);
+        ctx.setLineDash([]);
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(state.camera.zoom, state.camera.zoom);
+        ctx.translate(state.camera.x, state.camera.y);
+    }
+
+    ctx.restore();
+
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     update();
     requestAnimationFrame(render);
 }
 
+<<<<<<< HEAD
 window.regenerateWorld = function() {
     initMap();
     
     let baseSpawnX = state.map.width / 2;
     let baseSpawnY = state.map.height / 2;
     
+=======
+
+window.regenerateWorld = function() {
+    initMap();
+    
+
+    let baseSpawnX = state.map.width / 2;
+    let baseSpawnY = state.map.height / 2;
+    
+
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     const landTiles = [];
     for (let y = 0; y < state.map.height; y++) {
         for (let x = 0; x < state.map.width; x++) {
@@ -1155,6 +1607,10 @@ window.regenerateWorld = function() {
         let spawnX = baseSpawnX;
         let spawnY = baseSpawnY;
         
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         const nearbyLand = landTiles.filter(t => 
             Math.abs(t.x - baseSpawnX) <= 5 && 
             Math.abs(t.y - baseSpawnY) <= 5
@@ -1175,6 +1631,10 @@ window.regenerateWorld = function() {
     
     state.jobs = [];
     
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     state.camera.x = -(baseSpawnX * state.map.tileSize);
     state.camera.y = -(baseSpawnY * state.map.tileSize);
     
@@ -1189,9 +1649,21 @@ window.setOrder = function(type) {
         state.currentOrder = type;
     }
     
+<<<<<<< HEAD
+=======
+    const orderNames = {
+        'architect': 'Architect',
+        'unarchitect': 'Destruct',
+        'chop': 'Chop',
+        'mine': 'Mine',
+        'work': 'Work'
+    };
+
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     const buttons = document.querySelectorAll('#bottom-menu button');
     buttons.forEach(btn => {
-        if (btn.innerText.toLowerCase() === type) {
+        const btnText = btn.innerText;
+        if (orderNames[type] === btnText) {
             btn.style.background = state.currentOrder === type ? '#555' : '#333';
         } else {
             btn.style.background = '#333';
@@ -1199,6 +1671,10 @@ window.setOrder = function(type) {
     });
 };
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 window.addEventListener('resize', resize);
 resize();
 initMap();
