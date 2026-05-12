@@ -35,7 +35,6 @@ body, html {
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
 }
 
-/* UI Hiding Logic */
 #ui-overlay.ui-hidden > * {
     pointer-events: none;
 }
@@ -208,7 +207,7 @@ button:active {
 }
 
 #slider-time-display {
-    color: #fff;
+    color: #ff0000;
 }
 
 #regen-btn {
