@@ -25,7 +25,8 @@ const state = {
     },
     resources: {
         silver: 0,
-        stone: 0
+        stone: 0,
+        food: 10
     },
     entities: [],
     jobs: [],
@@ -50,10 +51,7 @@ const state = {
     keyPressTime: {}
 };
 
-<<<<<<< HEAD
-=======
 // тайлы
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 const TILE_TYPES = {
     GRASS: { color: 'rgb(95, 94, 40)', name: 'Grass', moveCost: 1 },
     LIGHT_GRASS: { color: 'rgb(125, 124, 60)', name: 'Light Grass', moveCost: 1 },
@@ -66,10 +64,7 @@ const TILE_TYPES = {
     WALL: { color: '#424242', name: 'Wall', solid: true }
 };
 
-<<<<<<< HEAD
-=======
 // генерация
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 const Noise = {
     p: new Uint8Array(512),
     init() {
@@ -103,10 +98,7 @@ const Noise = {
                             this.lerp(u, this.grad(this.p[ab], x, y - 1),
                                      this.grad(this.p[bb], x - 1, y - 1)));
     },
-<<<<<<< HEAD
-=======
     
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     fbm(x, y, octaves = 4) {
         let total = 0;
         let frequency = 1;
@@ -126,6 +118,7 @@ Noise.init();
 function updateResourceUI() {
     document.getElementById('silver-count').textContent = state.resources.silver;
     document.getElementById('stone-count').textContent = state.resources.stone;
+    document.getElementById('food-count').textContent = state.resources.food;
 }
 
 function updateCharacterMenu() {
@@ -153,10 +146,7 @@ function updateCharacterMenu() {
     });
 }
 
-<<<<<<< HEAD
-=======
 // карта
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 function initMap() {
     state.map.tiles = [];
     state.map.explored = new Uint8Array(state.map.width * state.map.height);
@@ -169,22 +159,9 @@ function initMap() {
             const nx = x + seedX;
             const ny = y + seedY;
 
-<<<<<<< HEAD
             const continent = Noise.fbm(nx * 0.003, ny * 0.003, 3);
             const detail = Noise.fbm(nx * 0.02, ny * 0.02, 4);
             const elevation = (continent * 0.85 + detail * 0.15);
-=======
-            
-            const continent = Noise.fbm(nx * 0.003, ny * 0.003, 3);
-            
-            
-            const detail = Noise.fbm(nx * 0.02, ny * 0.02, 4);
-            
-            
-            const elevation = (continent * 0.85 + detail * 0.15);
-            
-            
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
             const moisture = Noise.fbm(nx * 0.01 + 2000, ny * 0.01 + 2000, 3);
 
             let type;
@@ -195,23 +172,10 @@ function initMap() {
                 else type = TILE_TYPES.WATER;
             } else {
                 if (elevation < sea_level + 0.02) {
-<<<<<<< HEAD
-                    type = TILE_TYPES.SAND;
-                } else if (elevation > 0.82) {
-                    type = TILE_TYPES.STONE;
-                } else {
-                    if (moisture > 0.44) type = TILE_TYPES.GRASS;
-                    else if (moisture > 0.37) type = TILE_TYPES.SOIL;
-                    else type = TILE_TYPES.SAND;
-                }
-            }
-            
-=======
                     type = TILE_TYPES.SAND; 
                 } else if (elevation > 0.82) {
                     type = TILE_TYPES.STONE; 
                 } else {
-                    
                     if (moisture > 0.6) type = TILE_TYPES.LIGHT_GRASS;
                     else if (moisture > 0.44) type = TILE_TYPES.GRASS;
                     else if (moisture > 0.4) type = TILE_TYPES.DARK_GRASS;
@@ -221,7 +185,6 @@ function initMap() {
             }
             
             // старт с суши
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
             const distFromCenter = Math.sqrt(Math.pow(x - state.map.width / 2, 2) + Math.pow(y - state.map.height / 2, 2));
             if (distFromCenter < 5) {
                 if (type.solid || type === TILE_TYPES.WATER || type === TILE_TYPES.DEEP_WATER) {
@@ -234,8 +197,6 @@ function initMap() {
         state.map.tiles.push(row);
     }
 
-<<<<<<< HEAD
-=======
     // Вычисление расстояния до берега для воды
     const waterTiles = [];
     const queue = [];
@@ -294,15 +255,11 @@ function initMap() {
     }
     
     // чанки
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     state.map.chunks = [];
     const chunksX = Math.ceil(state.map.width / state.map.chunkSize);
     const chunksY = Math.ceil(state.map.height / state.map.chunkSize);
 
-<<<<<<< HEAD
-=======
     // дебаг
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     let stoneCount = 0;
     for (let y = 0; y < state.map.height; y++) {
         for (let x = 0; x < state.map.width; x++) {
@@ -327,11 +284,7 @@ function initMap() {
         }
         state.map.chunks.push(row);
     }
-
-<<<<<<< HEAD
-=======
     
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     state.map.chunks.forEach(row => row.forEach(c => c.dirty = true));
 }
 
@@ -372,12 +325,8 @@ function updateChunk(chunk) {
                 
                 ctx.fillRect(lx * ts, ly * ts, ts, ts);
 
-<<<<<<< HEAD
-                if (tile.type === TILE_TYPES.GRASS) {
-=======
                 // Add visual detail for special tiles
                 if (tile.type === TILE_TYPES.GRASS || tile.type === TILE_TYPES.LIGHT_GRASS || tile.type === TILE_TYPES.DARK_GRASS) {
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
                     ctx.lineWidth = 1;
                     ctx.lineCap = 'round';
                     const grassColor = tile.type === TILE_TYPES.LIGHT_GRASS ? 'rgba(190, 240, 130,' : 
@@ -565,10 +514,7 @@ function isPathClearOfWater(startX, startY, endX, endY) {
     return true;
 }
 
-<<<<<<< HEAD
-=======
 // колонисты
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 function initEntities() {
     state.entities.push({
         id: 1,
@@ -580,7 +526,9 @@ function initEntities() {
         job: null,
         speed: 0.1,
         needs: { food: 100, rest: 100 },
-        path: []
+        path: [],
+        currentSpeedModifier: 1.0,
+        statusMessages: []
     });
     state.entities.push({
         id: 2,
@@ -592,7 +540,9 @@ function initEntities() {
         job: null,
         speed: 0.12,
         needs: { food: 100, rest: 100 },
-        path: []
+        path: [],
+        currentSpeedModifier: 1.0,
+        statusMessages: []
     });
     state.entities.push({
         id: 3,
@@ -604,15 +554,14 @@ function initEntities() {
         job: null,
         speed: 0.08,
         needs: { food: 100, rest: 100 },
-        path: []
+        path: [],
+        currentSpeedModifier: 1.0,
+        statusMessages: []
     });
     updateCharacterMenu();
 }
 
-<<<<<<< HEAD
-=======
 // путь
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 function findPath(startX, startY, endX, endY) {
     startX = Math.floor(startX);
     startY = Math.floor(startY);
@@ -689,11 +638,7 @@ function findPath(startX, startY, endX, endY) {
         }
     }
 
-<<<<<<< HEAD
     return null;
-=======
-    return null; 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 }
 
 function resize() {
@@ -746,15 +691,6 @@ window.addEventListener('mousedown', (e) => {
 
                 if (job) {
                     state.jobs.push(job);
-<<<<<<< HEAD
-                    if (state.selectedEntity) {
-                        assignJobToEntity(state.selectedEntity, job);
-                    }
-                }
-            }
-        }
-    } else if (e.button === 0 && state.selectedEntity) {
-=======
                     state.selectedEntities.forEach(ent => {
                         assignJobToEntity(ent, job);
                     });
@@ -762,52 +698,10 @@ window.addEventListener('mousedown', (e) => {
             }
         }
     } else if (e.button === 0 && state.selectedEntities.length > 0) {
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         const worldPos = screenToWorld(e.clientX, e.clientY);
         const tx = Math.floor(worldPos.x / state.map.tileSize);
         const ty = Math.floor(worldPos.y / state.map.tileSize);
         
-<<<<<<< HEAD
-        const clickedEnt = state.entities.find(ent => {
-            const dx = ent.x - (worldPos.x / state.map.tileSize);
-            const dy = ent.y - (worldPos.y / state.map.tileSize);
-            return Math.sqrt(dx * dx + dy * dy) < 0.6;
-        });
-
-        if (clickedEnt && clickedEnt !== state.selectedEntity) {
-            selectEntity(clickedEnt);
-        } else if (isWalkable(tx, ty)) {
-            if (isPathClearOfWater(state.selectedEntity.x, state.selectedEntity.y, tx, ty)) {
-                state.selectedEntity.path = [{ x: tx + 0.5, y: ty + 0.5 }];
-                state.selectedEntity.target = state.selectedEntity.path[0];
-                state.selectedEntity.job = null;
-                state.selectedEntity.isManualMove = true;
-                console.log(`Commanded ${state.selectedEntity.name} to ${tx}, ${ty} (Straight Line)`);
-            } else {
-                const path = findPath(state.selectedEntity.x, state.selectedEntity.y, tx, ty);
-                if (path) {
-                    state.selectedEntity.path = path;
-                    state.selectedEntity.target = path[0];
-                    state.selectedEntity.isManualMove = true;
-                    state.selectedEntity.job = null;
-                }
-            }
-
-            const radialMenu = document.getElementById('radial-menu');
-            if (radialMenu) {
-                radialMenu.classList.remove('hidden');
-                radialMenu.style.left = `${e.clientX}px`;
-                radialMenu.style.top = `${e.clientY}px`;
-                state.lastClickPos = { x: e.clientX, y: e.clientY };
-            }
-        }
-    } else if (e.button === 0 && !state.currentOrder) {
-        const worldPos = screenToWorld(e.clientX, e.clientY);
-        const tx = Math.floor(worldPos.x / state.map.tileSize);
-        const ty = Math.floor(worldPos.y / state.map.tileSize);
-        
-=======
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         const clickedEnt = state.entities.find(ent => {
             const dx = ent.x - (worldPos.x / state.map.tileSize);
             const dy = ent.y - (worldPos.y / state.map.tileSize);
@@ -867,12 +761,8 @@ window.addEventListener('mousedown', (e) => {
 
 function selectEntity(ent) {
     state.selectedEntity = ent;
-<<<<<<< HEAD
-    ent.isManualMove = false;
-=======
     state.selectedEntities = [ent];
     ent.isManualMove = false; 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     updateInspectPanel(ent);
     updateCharacterMenu();
 }
@@ -956,13 +846,48 @@ function updateInspectPanel(ent) {
     const content = document.getElementById('inspect-content');
     panel.classList.remove('hidden');
     title.innerText = ent.name;
+    
+    let statusText = ent.job ? 'Working' : (ent.target ? 'Moving' : 'Idle');
+    if (ent.status === 'eating') statusText = 'Eating';
+    if (ent.status === 'sleeping') statusText = 'Sleeping';
+
     content.innerHTML = `
-        <p>Status: ${ent.job ? 'Working' : (ent.target ? 'Moving' : 'Idle')}</p>
+        <p>Status: ${statusText}</p>
         <p>Food: ${Math.floor(ent.needs.food)}%</p>
         <p>Rest: ${Math.floor(ent.needs.rest)}%</p>
+        <div class="inspect-actions">
+            <button onclick="orderEat()" ${state.resources.food <= 0 || ent.needs.food >= 100 || ent.status ? 'disabled' : ''}>Eat (1 Food)</button>
+            <button onclick="orderSleep()" ${ent.needs.rest >= 100 || ent.status ? 'disabled' : ''}>Sleep</button>
+        </div>
         <p style="color: #81d4fa; font-size: 0.8em;">(Left-click to move)</p>
     `;
 }
+
+window.orderEat = function() {
+    if (!state.selectedEntity || state.resources.food <= 0) return;
+    const ent = state.selectedEntity;
+    if (ent.needs.food < 100) {
+        state.resources.food--;
+        updateResourceUI();
+        ent.status = 'eating';
+        ent.job = null;
+        ent.target = null;
+        ent.path = [];
+        updateInspectPanel(ent);
+    }
+};
+
+window.orderSleep = function() {
+    if (!state.selectedEntity) return;
+    const ent = state.selectedEntity;
+    if (ent.needs.rest < 100) {
+        ent.status = 'sleeping';
+        ent.job = null;
+        ent.target = null;
+        ent.path = [];
+        updateInspectPanel(ent);
+    }
+};
 
 function showInspectPanel(titleText, contentHTML) {
     const panel = document.getElementById('inspect-panel');
@@ -986,11 +911,7 @@ window.addEventListener('keydown', (e) => {
     }
     
     if (e.code === 'Space') {
-<<<<<<< HEAD
         e.preventDefault();
-=======
-        e.preventDefault(); 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         deselectEntity();
     } else if (e.code === 'KeyL') {
         toggleFogOfWar();
@@ -1154,8 +1075,6 @@ function assignJobToEntity(ent, job) {
 }
 
 function update() {
-<<<<<<< HEAD
-=======
     const camSpeed = 10 / state.camera.zoom;
     if (state.keys['KeyW']) state.camera.y += camSpeed;
     if (state.keys['KeyS']) state.camera.y -= camSpeed;
@@ -1163,7 +1082,6 @@ function update() {
     if (state.keys['KeyD']) state.camera.x -= camSpeed;
 
     // Update Time
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     state.time.tick++;
     if (state.time.tick % 60 === 0) {
         state.time.minute++;
@@ -1179,10 +1097,29 @@ function update() {
     }
 
     state.entities.forEach(ent => {
-<<<<<<< HEAD
-=======
+        // Потребности
+        if (ent.status !== 'sleeping') {
+            ent.needs.food = Math.max(0, ent.needs.food - 0.002);
+            ent.needs.rest = Math.max(0, ent.needs.rest - 0.0015);
+        } else {
+            ent.needs.rest = Math.min(100, ent.needs.rest + 0.05);
+            if (ent.needs.rest >= 100) {
+                ent.status = null;
+            }
+        }
+
+        if (ent.status === 'eating') {
+            ent.needs.food = Math.min(100, ent.needs.food + 0.5);
+            if (ent.needs.food >= 100) {
+                ent.status = null;
+            }
+        }
+
+        if (ent.status === 'sleeping' || ent.status === 'eating') {
+            if (state.selectedEntity === ent) updateInspectPanel(ent);
+            return; // Пропускаем движение и работу если спит или ест
+        }
   
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         if (!ent.job && !ent.target && (!ent.waypointQueue || ent.waypointQueue.length === 0)) {
             const availableJob = state.jobs.find(j => !j.assigned);
             if (availableJob) {
@@ -1199,11 +1136,7 @@ function update() {
                 ent.y = ent.target.y;
                 
                 if (ent.path && ent.path.length > 0) {
-<<<<<<< HEAD
                     ent.path.shift();
-=======
-                    ent.path.shift(); 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
                     if (ent.path.length > 0) {
                         ent.target = ent.path[0];
                     } else {
@@ -1232,6 +1165,17 @@ function update() {
                     const tile = state.map.tiles[ty][tx];
                     speedMult = 1 / (tile.type.moveCost || 1);
                 }
+
+                // Эффекты от потребностей
+                if (ent.needs.food < 20) speedMult *= 0.5;
+                if (ent.needs.rest < 20) speedMult *= 0.5;
+                if (ent.needs.rest <= 0) {
+                    ent.status = 'sleeping';
+                    ent.job = null;
+                    ent.target = null;
+                    ent.path = [];
+                }
+
                 ent.x += (dx / dist) * ent.speed * speedMult;
                 ent.y += (dy / dist) * ent.speed * speedMult;
             }
@@ -1335,7 +1279,6 @@ function render() {
         }
     }
 
-<<<<<<< HEAD
     if (state.camera.zoom > 0.5) {
         ctx.strokeStyle = 'rgba(0,0,0,0.1)';
         ctx.lineWidth = 1 / state.camera.zoom;
@@ -1357,8 +1300,6 @@ function render() {
         ctx.stroke();
     }
 
-=======
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     if (state.currentOrder === 'architect') {
         const mouseWorld = screenToWorld(state.camera.lastMouseX, state.camera.lastMouseY);
         const tx = Math.floor(mouseWorld.x / state.map.tileSize);
@@ -1406,11 +1347,7 @@ function render() {
     });
 
     state.entities.forEach(ent => {
-<<<<<<< HEAD
-        if (state.selectedEntity === ent) {
-=======
         if (state.selectedEntities.includes(ent)) {
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
             ctx.strokeStyle = '#81d4fa';
             ctx.lineWidth = 2 / state.camera.zoom;
             ctx.beginPath();
@@ -1430,12 +1367,7 @@ function render() {
                 });
                 
                 ctx.stroke();
-<<<<<<< HEAD
-                ctx.setLineDash([]);
-=======
                 ctx.setLineDash([]); 
-
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 
                  const lastPoint = ent.path[ent.path.length - 1];
                  ctx.beginPath();
@@ -1464,11 +1396,7 @@ function render() {
                  
                  ent.waypointQueue.forEach(wp => {
                      ctx.lineTo(wp.x * state.map.tileSize, wp.y * state.map.tileSize);
-<<<<<<< HEAD
-                     ctx.stroke();
-=======
                      ctx.stroke(); 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
                      ctx.beginPath();
                      ctx.arc(wp.x * state.map.tileSize, wp.y * state.map.tileSize, 3 / state.camera.zoom, 0, Math.PI * 2);
                      ctx.stroke();
@@ -1487,17 +1415,16 @@ function render() {
         ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 3, 0, Math.PI * 2);
         ctx.fill();
         
-<<<<<<< HEAD
-=======
 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         ctx.fillStyle = 'white';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(ent.name, ent.x * state.map.tileSize, ent.y * state.map.tileSize - 15);
+        let displayName = ent.name;
+        if (ent.status === 'eating') displayName += ' 🍎';
+        if (ent.status === 'sleeping') displayName += ' 💤';
+        ctx.fillText(displayName, ent.x * state.map.tileSize, ent.y * state.map.tileSize - 15);
     });
 
-<<<<<<< HEAD
     const edgeSize = 1000;
     const mapW = state.map.width * state.map.tileSize;
     const mapH = state.map.height * state.map.tileSize;
@@ -1538,7 +1465,6 @@ function render() {
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-=======
     if (state.selectionBox.active) {
         ctx.restore();
         const minX = Math.min(state.selectionBox.startX, state.selectionBox.endX);
@@ -1562,29 +1488,16 @@ function render() {
 
     ctx.restore();
 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     update();
     requestAnimationFrame(render);
 }
 
-<<<<<<< HEAD
-window.regenerateWorld = function() {
-    initMap();
-    
-    let baseSpawnX = state.map.width / 2;
-    let baseSpawnY = state.map.height / 2;
-    
-=======
-
 window.regenerateWorld = function() {
     initMap();
     
 
     let baseSpawnX = state.map.width / 2;
     let baseSpawnY = state.map.height / 2;
-    
-
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     const landTiles = [];
     for (let y = 0; y < state.map.height; y++) {
         for (let x = 0; x < state.map.width; x++) {
@@ -1607,10 +1520,7 @@ window.regenerateWorld = function() {
         let spawnX = baseSpawnX;
         let spawnY = baseSpawnY;
         
-<<<<<<< HEAD
-=======
 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
         const nearbyLand = landTiles.filter(t => 
             Math.abs(t.x - baseSpawnX) <= 5 && 
             Math.abs(t.y - baseSpawnY) <= 5
@@ -1631,10 +1541,7 @@ window.regenerateWorld = function() {
     
     state.jobs = [];
     
-<<<<<<< HEAD
-=======
 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     state.camera.x = -(baseSpawnX * state.map.tileSize);
     state.camera.y = -(baseSpawnY * state.map.tileSize);
     
@@ -1649,8 +1556,6 @@ window.setOrder = function(type) {
         state.currentOrder = type;
     }
     
-<<<<<<< HEAD
-=======
     const orderNames = {
         'architect': 'Architect',
         'unarchitect': 'Destruct',
@@ -1659,7 +1564,6 @@ window.setOrder = function(type) {
         'work': 'Work'
     };
 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
     const buttons = document.querySelectorAll('#bottom-menu button');
     buttons.forEach(btn => {
         const btnText = btn.innerText;
@@ -1671,10 +1575,7 @@ window.setOrder = function(type) {
     });
 };
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 0a3ccc7fd5052ebcf6c085b2cfecdf1d502b7105
 window.addEventListener('resize', resize);
 resize();
 initMap();

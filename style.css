@@ -317,3 +317,22 @@ button:active {
 #inspect-content p {
     margin: 8px 0;
 }
+
+.inspect-actions {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.inspect-actions button {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+.inspect-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    background: rgba(255, 255, 255, 0.05);
+}
