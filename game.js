@@ -1,5 +1,6 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+
 const state = {
     camera: {
         x: -1616,
@@ -49,6 +50,7 @@ const state = {
     keys: {},
     keyPressTime: {}
 };
+
 const TILE_TYPES = {
     GRASS: { color: 'rgb(95, 94, 40)', name: 'Grass', moveCost: 1 },
     LIGHT_GRASS: { color: 'rgb(125, 124, 60)', name: 'Light Grass', moveCost: 1 },
@@ -60,6 +62,7 @@ const TILE_TYPES = {
     SAND: { color: '#c2b280', name: 'Sand', moveCost: 1.5 },
     WALL: { color: '#424242', name: 'Wall', solid: true }
 };
+
 const Noise = {
     p: new Uint8Array(512),
     init() {
@@ -108,11 +111,13 @@ const Noise = {
     }
 };
 Noise.init();
+
 function updateResourceUI() {
     document.getElementById('silver-count').textContent = state.resources.silver;
     document.getElementById('stone-count').textContent = state.resources.stone;
     document.getElementById('food-count').textContent = state.resources.food;
 }
+
 function updateCharacterMenu() {
     const list = document.getElementById('character-list');
     if (!list) return;
@@ -129,6 +134,7 @@ function updateCharacterMenu() {
         list.appendChild(card);
     });
 }
+
 function initMap() {
     state.map.tiles = [];
     state.map.explored = new Uint8Array(state.map.width * state.map.height);
@@ -224,25 +230,80 @@ function initMap() {
     }
     state.map.chunks.forEach(row => row.forEach(c => c.dirty = true));
 }
+
+function getWaterColor(dist) {
+    if (dist < 3) return '#29b6f6';
+    if (dist < 8) {
+        const t = (dist - 3) / 5;
+        return interpolateColor('#29b6f6', '#0288d1', t);
+    }
+    if (dist < 20) {
+        const t = (dist - 8) / 12;
+        return interpolateColor('#0288d1', '#01579b', t);
+    }
+    const t = Math.min(1, (dist - 20) / 20);
+    return interpolateColor('#01579b', '#002f6c', t);
+}
+
+function interpolateColor(c1, c2, t) {
+    const hex = (c) => {
+        if (c.startsWith('#')) {
+            const r = parseInt(c.slice(1, 3), 16);
+            const g = parseInt(c.slice(3, 5), 16);
+            const b = parseInt(c.slice(5, 7), 16);
+            return [r, g, b];
+        }
+        const rgb = c.match(/\d+/g).map(Number);
+        return rgb;
+    };
+    const rgb1 = hex(c1);
+    const rgb2 = hex(c2);
+    const r = Math.round(rgb1[0] + (rgb2[0] - rgb1[0]) * t);
+    const g = Math.round(rgb1[1] + (rgb2[1] - rgb1[1]) * t);
+    const b = Math.round(rgb1[2] + (rgb2[2] - rgb1[2]) * t);
+    return `rgb(${r},${g},${b})`;
+}
+
 function updateChunk(chunk) {
     const ctx = chunk.ctx;
     const size = state.map.chunkSize;
     const ts = state.map.tileSize;
+    
+    const bgCanvas = document.createElement('canvas');
+    bgCanvas.width = size + 2;
+    bgCanvas.height = size + 2;
+    const bgCtx = bgCanvas.getContext('2d');
+    
+    for (let ly = -1; ly <= size; ly++) {
+        for (let lx = -1; lx <= size; lx++) {
+            const gy = chunk.cy * size + ly;
+            const gx = chunk.cx * size + lx;
+            
+            let color = '#002f6c';
+            if (gy >= 0 && gy < state.map.height && gx >= 0 && gx < state.map.width) {
+                const tile = state.map.tiles[gy][gx];
+                if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER) {
+                    color = getWaterColor(tile.shoreDist || 0);
+                } else {
+                    color = tile.type.color;
+                }
+            }
+            bgCtx.fillStyle = color;
+            bgCtx.fillRect(lx + 1, ly + 1, 1, 1);
+        }
+    }
+    
     ctx.clearRect(0, 0, chunk.canvas.width, chunk.canvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bgCanvas, 1, 1, size, size, 0, 0, size * ts, size * ts);
+
     for (let ly = 0; ly < size; ly++) {
         for (let lx = 0; lx < size; lx++) {
             const gy = chunk.cy * size + ly;
             const gx = chunk.cx * size + lx;
             if (gy < state.map.height && gx < state.map.width) {
                 const tile = state.map.tiles[gy][gx];
-                if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER) {
-                    const dist = tile.shoreDist || 0;
-                    if (dist < 3) ctx.fillStyle = '#29b6f6';
-                    else if (dist < 8) ctx.fillStyle = '#0288d1';
-                    else if (dist < 20) ctx.fillStyle = '#01579b';
-                    else ctx.fillStyle = '#002f6c';
-                } else ctx.fillStyle = tile.type.color;
-                ctx.fillRect(lx * ts, ly * ts, ts, ts);
                 if (tile.type === TILE_TYPES.GRASS || tile.type === TILE_TYPES.LIGHT_GRASS || tile.type === TILE_TYPES.DARK_GRASS) {
                     ctx.lineWidth = 1; ctx.lineCap = 'round';
                     const grassColor = tile.type === TILE_TYPES.LIGHT_GRASS ? 'rgba(190, 240, 130,' : (tile.type === TILE_TYPES.DARK_GRASS ? 'rgba(120, 160, 80,' : 'rgba(160, 210, 100,');
@@ -271,26 +332,35 @@ function updateChunk(chunk) {
                         const oy = (gy * 41 + i * 13) % (ts - 8) + 4;
                         ctx.beginPath(); ctx.moveTo(lx * ts + ox, ly * ts + oy); ctx.lineTo(lx * ts + ox + 4, ly * ts + oy + 2); ctx.stroke();
                     }
+                } else if (tile.type === TILE_TYPES.WALL) {
+                    ctx.fillStyle = tile.type.color;
+                    ctx.fillRect(lx * ts, ly * ts, ts, ts);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.strokeRect(lx * ts + 1, ly * ts + 1, ts - 2, ts - 2);
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                    ctx.strokeRect(lx * ts, ly * ts, ts, ts);
                 }
             }
         }
     }
     chunk.dirty = false;
 }
+
 function markTileDirty(tx, ty) {
     const cx = Math.floor(tx / state.map.chunkSize);
     const cy = Math.floor(ty / state.map.chunkSize);
     if (state.map.chunks[cy] && state.map.chunks[cy][cx]) state.map.chunks[cy][cx].dirty = true;
 }
+
 function drawFogOfWar() {
     const ts = state.map.tileSize;
-    const visionRadiusPx = state.map.visionRadius * ts * 2.0;
+    const visionRadiusPx = state.map.visionRadius * ts * 1.2; 
     const currentTime = state.time.hour + state.time.minute / 60;
-    let fogIntensity = 0.9; 
-    if (currentTime >= 4 && currentTime < 9) fogIntensity = 0.9 * (1 - (currentTime - 4) / 5);
+    let fogIntensity = 1.0; 
+    if (currentTime >= 4 && currentTime < 9) fogIntensity = 1.0 * (1 - (currentTime - 4) / 5);
     else if (currentTime >= 9 && currentTime < 15) fogIntensity = 0;
-    else if (currentTime >= 15 && currentTime < 21) fogIntensity = 0.9 * (currentTime - 15) / 6;
-    else fogIntensity = 0.9;
+    else if (currentTime >= 15 && currentTime < 21) fogIntensity = 1.0 * (currentTime - 15) / 6;
+    else fogIntensity = 1.0;
     if (fogIntensity <= 0) return;
     if (!state.fowCanvas) {
         state.fowCanvas = document.createElement('canvas');
@@ -301,7 +371,7 @@ function drawFogOfWar() {
         state.fowCanvas.height = canvas.height;
     }
     const fCtx = state.fowCtx;
-    fCtx.imageSmoothingEnabled = false;
+    fCtx.imageSmoothingEnabled = true;
     fCtx.globalCompositeOperation = 'source-over';
     fCtx.clearRect(0, 0, canvas.width, canvas.height);
     fCtx.fillStyle = `rgba(0, 0, 0, ${fogIntensity})`;
@@ -317,7 +387,7 @@ function drawFogOfWar() {
         const zoomRadius = Math.floor(visionRadiusPx * state.camera.zoom);
         const grad = fCtx.createRadialGradient(screenX, screenY, 0, screenX, screenY, zoomRadius);
         grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        grad.addColorStop(0.6, 'rgba(255, 255, 255, 1)');
+        grad.addColorStop(0.4, 'rgba(255, 255, 255, 1)'); 
         grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
         fCtx.fillStyle = grad;
         fCtx.beginPath(); fCtx.arc(screenX, screenY, zoomRadius, 0, Math.PI * 2); fCtx.fill();
@@ -327,6 +397,7 @@ function drawFogOfWar() {
     ctx.drawImage(state.fowCanvas, 0, 0);
     ctx.restore();
 }
+
 function isWalkable(tx, ty) {
     if (tx < 0 || tx >= state.map.width || ty < 0 || ty >= state.map.height) return false;
     const tile = state.map.tiles[ty][tx];
@@ -341,6 +412,7 @@ function isWalkable(tx, ty) {
     }
     return true;
 }
+
 function isPathClearOfWater(startX, startY, endX, endY) {
     const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
     const steps = Math.ceil(dist * 2);
@@ -355,6 +427,7 @@ function isPathClearOfWater(startX, startY, endX, endY) {
     }
     return true;
 }
+
 function initEntities() {
     state.entities.push({
         id: 1, name: 'Makcum', x: 50.5, y: 50.5, color: '#ffcc80', target: null, job: null,
@@ -370,6 +443,7 @@ function initEntities() {
     });
     updateCharacterMenu();
 }
+
 function findPath(startX, startY, endX, endY) {
     startX = Math.floor(startX); startY = Math.floor(startY);
     endX = Math.floor(endX); endY = Math.floor(endY);
@@ -410,10 +484,12 @@ function findPath(startX, startY, endX, endY) {
     }
     return null;
 }
+
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
+
 function tryPlaceJob(mouseX, mouseY) {
     if (!state.currentOrder) return;
     const worldPos = screenToWorld(mouseX, mouseY);
@@ -430,7 +506,9 @@ function tryPlaceJob(mouseX, mouseY) {
         }
     }
 }
+
 window.addEventListener('contextmenu', (e) => e.preventDefault());
+
 window.addEventListener('mousedown', (e) => {
     if (e.target.closest('#top-bar') || e.target.closest('#bottom-menu') || e.target.closest('#inspect-panel') || e.target.closest('#character-menu') || e.target.closest('#regen-btn')) return;
     if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
@@ -477,12 +555,15 @@ window.addEventListener('mousedown', (e) => {
         }
     }
 });
+
 function selectEntity(ent) {
     state.selectedEntities = [ent]; ent.isManualMove = false; updateInspectPanel(ent); updateCharacterMenu();
 }
+
 function deselectEntity() {
     state.selectedEntities = []; document.getElementById('inspect-panel').classList.add('hidden'); updateCharacterMenu();
 }
+
 function toggleEntitySelection(ent) {
     const index = state.selectedEntities.indexOf(ent);
     if (index > -1) state.selectedEntities.splice(index, 1);
@@ -491,6 +572,7 @@ function toggleEntitySelection(ent) {
     else document.getElementById('inspect-panel').classList.add('hidden');
     updateCharacterMenu();
 }
+
 function selectEntitiesInBox() {
     const minX = Math.min(state.selectionBox.startX, state.selectionBox.endX);
     const minY = Math.min(state.selectionBox.startY, state.selectionBox.endY);
@@ -505,6 +587,7 @@ function selectEntitiesInBox() {
     else document.getElementById('inspect-panel').classList.add('hidden');
     updateCharacterMenu();
 }
+
 function selectAllEntities() {
     if (state.selectedEntities.length === state.entities.length) deselectEntity();
     else {
@@ -513,11 +596,13 @@ function selectAllEntities() {
         updateCharacterMenu();
     }
 }
+
 function worldToScreen(worldX, worldY) {
     const screenX = (worldX + state.camera.x) * state.camera.zoom + canvas.width / 2;
     const screenY = (worldY + state.camera.y) * state.camera.zoom + canvas.height / 2;
     return { x: screenX, y: screenY };
 }
+
 function updateInspectPanel(ent) {
     const panel = document.getElementById('inspect-panel');
     const title = document.getElementById('inspect-title');
@@ -538,6 +623,7 @@ function updateInspectPanel(ent) {
         <p style="color: #81d4fa; font-size: 0.8em;">(Right-click to move)</p>
     `;
 }
+
 window.orderEat = function() {
     if (state.selectedEntities.length === 0 || state.resources.food <= 0) return;
     const ent = state.selectedEntities[0];
@@ -547,6 +633,7 @@ window.orderEat = function() {
         updateInspectPanel(ent);
     }
 };
+
 window.orderSleep = function() {
     if (state.selectedEntities.length === 0) return;
     const ent = state.selectedEntities[0];
@@ -555,11 +642,13 @@ window.orderSleep = function() {
         updateInspectPanel(ent);
     }
 };
+
 function screenToWorld(screenX, screenY) {
     const x = (screenX - canvas.width / 2) / state.camera.zoom - state.camera.x;
     const y = (screenY - canvas.height / 2) / state.camera.zoom - state.camera.y;
     return { x, y };
 }
+
 window.addEventListener('keydown', (e) => {
     state.keys[e.code] = true;
     if (!state.keyPressTime[e.code]) state.keyPressTime[e.code] = Date.now();
@@ -572,6 +661,7 @@ window.addEventListener('keydown', (e) => {
     else if (e.code === 'KeyC') setOrder('chop');
     else if (e.code === 'KeyT') selectAllEntities();
 });
+
 window.addEventListener('keyup', (e) => {
     state.keys[e.code] = false;
     if (e.code === 'KeyR' && state.keyPressTime[e.code]) {
@@ -579,6 +669,7 @@ window.addEventListener('keyup', (e) => {
         delete state.keyPressTime[e.code];
     }
 });
+
 function toggleDebugTime() {
     const panel = document.getElementById('debug-time-panel');
     panel.classList.toggle('hidden');
@@ -588,6 +679,7 @@ function toggleDebugTime() {
         updateSliderDisplay();
     }
 }
+
 function updateSliderDisplay() {
     const slider = document.getElementById('time-slider');
     const display = document.getElementById('slider-time-display');
@@ -595,6 +687,7 @@ function updateSliderDisplay() {
     const h = Math.floor(totalMinutes / 60); const m = totalMinutes % 60;
     display.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
+
 document.addEventListener('DOMContentLoaded', () => {
     const slider = document.getElementById('time-slider');
     if (slider) {
@@ -605,11 +698,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
 function toggleUI() { document.getElementById('ui-overlay').classList.toggle('ui-hidden'); }
+
 function toggleFogOfWar() {
     state.map.fogOfWarEnabled = !state.map.fogOfWarEnabled;
     state.map.chunks.forEach(row => row.forEach(c => c.dirty = true));
 }
+
 window.addEventListener('mousemove', (e) => {
     if (state.camera.isDragging) {
         state.camera.x += (e.clientX - state.camera.lastMouseX) / state.camera.zoom;
@@ -619,6 +715,7 @@ window.addEventListener('mousemove', (e) => {
     if (state.isPainting) { tryPlaceJob(e.clientX, e.clientY); }
     state.camera.lastMouseX = e.clientX; state.camera.lastMouseY = e.clientY;
 });
+
 window.addEventListener('mouseup', (e) => {
     if (state.selectionBox.active && e.button === 0) {
         state.selectionBox.endX = e.clientX; state.selectionBox.endY = e.clientY;
@@ -628,6 +725,7 @@ window.addEventListener('mouseup', (e) => {
     state.isPainting = false;
     state.camera.isDragging = false;
 });
+
 window.addEventListener('wheel', (e) => {
     e.preventDefault();
     const factor = e.deltaY > 0 ? 0.9 : 1.1;
@@ -641,12 +739,14 @@ window.addEventListener('wheel', (e) => {
         state.camera.y += (mouseWorldAfter.y - mouseWorldBefore.y);
     }
 }, { passive: false });
+
 function assignJobToEntity(ent, job) {
     if (ent.job) ent.job.assigned = false;
     ent.job = job; job.assigned = true;
     if (isPathClearOfWater(ent.x, ent.y, job.x, job.y)) { ent.path = [{ x: job.x + 0.5, y: job.y + 0.5 }]; ent.target = ent.path[0]; }
     else { const path = findPath(ent.x, ent.y, job.x, job.y); if (path) { ent.path = path; ent.target = path[0]; } }
 }
+
 function update() {
     const camSpeed = 10 / state.camera.zoom;
     if (state.keys['KeyW']) state.camera.y += camSpeed;
@@ -739,22 +839,28 @@ function update() {
         }
     });
 }
+
 function updateTimeUI() {
     const timeDisplay = document.getElementById('time');
     if (!timeDisplay) return;
     timeDisplay.innerText = `Day ${state.time.day}, ${String(state.time.hour).padStart(2, '0')}:${String(state.time.minute).padStart(2, '0')}`;
 }
+
 function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(state.camera.zoom, state.camera.zoom);
     ctx.translate(state.camera.x, state.camera.y);
-    const viewW = canvas.width / state.camera.zoom; const viewH = canvas.height / state.camera.zoom;
-    const worldViewLeft = -state.camera.x - viewW / 2; const worldViewTop = -state.camera.y - viewH / 2;
+    const viewW = canvas.width / state.camera.zoom;
+    const viewH = canvas.height / state.camera.zoom;
+    const worldViewLeft = -state.camera.x - viewW / 2;
+    const worldViewTop = -state.camera.y - viewH / 2;
     const chunkSizePx = state.map.chunkSize * state.map.tileSize;
-    const startCX = Math.floor(worldViewLeft / chunkSizePx); const endCX = Math.ceil((worldViewLeft + viewW) / chunkSizePx);
-    const startCY = Math.floor(worldViewTop / chunkSizePx); const endCY = Math.ceil((worldViewTop + viewH) / chunkSizePx);
+    const startCX = Math.floor(worldViewLeft / chunkSizePx);
+    const endCX = Math.ceil((worldViewLeft + viewW) / chunkSizePx);
+    const startCY = Math.floor(worldViewTop / chunkSizePx);
+    const endCY = Math.ceil((worldViewTop + viewH) / chunkSizePx);
     for (let cy = Math.max(0, startCY); cy < Math.min(state.map.chunks.length, endCY); cy++) {
         for (let cx = Math.max(0, startCX); cx < Math.min(state.map.chunks[cy].length, endCX); cx++) {
             const chunk = state.map.chunks[cy][cx];
@@ -763,16 +869,27 @@ function render() {
         }
     }
     if (state.camera.zoom > 0.5) {
-        ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1 / state.camera.zoom; ctx.beginPath();
-        const startTX = Math.floor(worldViewLeft / state.map.tileSize); const endTX = Math.ceil((worldViewLeft + viewW) / state.map.tileSize);
-        const startTY = Math.floor(worldViewTop / state.map.tileSize); const endTY = Math.ceil((worldViewTop + viewH) / state.map.tileSize);
-        for (let x = Math.max(0, startTX); x <= Math.min(state.map.width, endTX); x++) { ctx.moveTo(x * state.map.tileSize, Math.max(0, startTY) * state.map.tileSize); ctx.lineTo(x * state.map.tileSize, Math.min(state.map.height, endTY) * state.map.tileSize); }
-        for (let y = Math.max(0, startTY); y <= Math.min(state.map.height, endTY); y++) { ctx.moveTo(Math.max(0, startTX) * state.map.tileSize, y * state.map.tileSize); ctx.lineTo(Math.min(state.map.width, endTX) * state.map.tileSize, y * state.map.tileSize); }
+        ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+        ctx.lineWidth = 1 / state.camera.zoom;
+        ctx.beginPath();
+        const startTX = Math.floor(worldViewLeft / state.map.tileSize);
+        const endTX = Math.ceil((worldViewLeft + viewW) / state.map.tileSize);
+        const startTY = Math.floor(worldViewTop / state.map.tileSize);
+        const endTY = Math.ceil((worldViewTop + viewH) / state.map.tileSize);
+        for (let x = Math.max(0, startTX); x <= Math.min(state.map.width, endTX); x++) {
+            ctx.moveTo(x * state.map.tileSize, Math.max(0, startTY) * state.map.tileSize);
+            ctx.lineTo(x * state.map.tileSize, Math.min(state.map.height, endTY) * state.map.tileSize);
+        }
+        for (let y = Math.max(0, startTY); y <= Math.min(state.map.height, endTY); y++) {
+            ctx.moveTo(Math.max(0, startTX) * state.map.tileSize, y * state.map.tileSize);
+            ctx.lineTo(Math.min(state.map.width, endTX) * state.map.tileSize, y * state.map.tileSize);
+        }
         ctx.stroke();
     }
     if (state.currentOrder === 'architect' || state.currentOrder === 'unarchitect') {
         const mouseWorld = screenToWorld(state.camera.lastMouseX, state.camera.lastMouseY);
-        const tx = Math.floor(mouseWorld.x / state.map.tileSize); const ty = Math.floor(mouseWorld.y / state.map.tileSize);
+        const tx = Math.floor(mouseWorld.x / state.map.tileSize);
+        const ty = Math.floor(mouseWorld.y / state.map.tileSize);
         if (tx >= 0 && tx < state.map.width && ty >= 0 && ty < state.map.height) {
             ctx.fillStyle = state.currentOrder === 'architect' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 0, 0, 0.3)';
             ctx.fillRect(tx * state.map.tileSize, ty * state.map.tileSize, state.map.tileSize, state.map.tileSize);
@@ -780,7 +897,8 @@ function render() {
     }
     drawFogOfWar();
     state.jobs.forEach(job => {
-        ctx.setLineDash(job.type === 'build_wall' ? [5, 5] : [2, 2]); ctx.strokeStyle = job.type === 'build_wall' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 0, 0, 0.5)';
+        ctx.setLineDash(job.type === 'build_wall' ? [5, 5] : [2, 2]);
+        ctx.strokeStyle = job.type === 'build_wall' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 0, 0, 0.5)';
         ctx.strokeRect(job.x * state.map.tileSize + 2, job.y * state.map.tileSize + 2, state.map.tileSize - 4, state.map.tileSize - 4);
         ctx.setLineDash([]);
         if (job.progress > 0) {
@@ -791,28 +909,53 @@ function render() {
     });
     state.entities.forEach(ent => {
         if (state.selectedEntities.includes(ent)) {
-            ctx.strokeStyle = '#81d4fa'; ctx.lineWidth = 2 / state.camera.zoom; ctx.beginPath();
-            ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 2, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = '#81d4fa';
+            ctx.lineWidth = 2 / state.camera.zoom;
+            ctx.beginPath();
+            ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 2, 0, Math.PI * 2);
+            ctx.stroke();
             if (ent.path && ent.path.length > 0) {
-                ctx.beginPath(); ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 2 / state.camera.zoom; ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 2 / state.camera.zoom;
+                ctx.setLineDash([5, 5]);
                 ctx.moveTo(ent.x * state.map.tileSize, ent.y * state.map.tileSize);
                 ent.path.forEach(point => ctx.lineTo(point.x * state.map.tileSize, point.y * state.map.tileSize));
-                ctx.stroke(); ctx.setLineDash([]);
+                ctx.stroke();
+                ctx.setLineDash([]);
                 const lastPoint = ent.path[ent.path.length - 1];
-                ctx.beginPath(); ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'; ctx.arc(lastPoint.x * state.map.tileSize, lastPoint.y * state.map.tileSize, state.map.tileSize / 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.beginPath();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.arc(lastPoint.x * state.map.tileSize, lastPoint.y * state.map.tileSize, state.map.tileSize / 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
             }
         }
-        ctx.fillStyle = ent.color; ctx.beginPath(); ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 3, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'white'; ctx.font = '10px Arial'; ctx.textAlign = 'center';
-        let displayName = ent.name; if (ent.status === 'eating') displayName += ' 🍎'; if (ent.status === 'sleeping') displayName += ' 💤';
+        ctx.fillStyle = ent.color;
+        ctx.beginPath();
+        ctx.arc(ent.x * state.map.tileSize, ent.y * state.map.tileSize, state.map.tileSize / 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        let displayName = ent.name;
+        if (ent.status === 'eating') displayName += ' 🍎';
+        if (ent.status === 'sleeping') displayName += ' 💤';
         ctx.fillText(displayName, ent.x * state.map.tileSize, ent.y * state.map.tileSize - 15);
     });
     ctx.restore();
     if (state.selectionBox.active) {
-        const minX = Math.min(state.selectionBox.startX, state.selectionBox.endX); const minY = Math.min(state.selectionBox.startY, state.selectionBox.endY);
-        const width = Math.abs(state.selectionBox.endX - state.selectionBox.startX); const height = Math.abs(state.selectionBox.endY - state.selectionBox.startY);
-        ctx.strokeStyle = '#81d4fa'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.strokeRect(minX, minY, width, height);
-        ctx.fillStyle = 'rgba(129, 212, 250, 0.1)'; ctx.fillRect(minX, minY, width, height); ctx.setLineDash([]);
+        const minX = Math.min(state.selectionBox.startX, state.selectionBox.endX);
+        const minY = Math.min(state.selectionBox.startY, state.selectionBox.endY);
+        const width = Math.abs(state.selectionBox.endX - state.selectionBox.startX);
+        const height = Math.abs(state.selectionBox.endY - state.selectionBox.startY);
+        ctx.strokeStyle = '#81d4fa';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(minX, minY, width, height);
+        ctx.fillStyle = 'rgba(129, 212, 250, 0.1)';
+        ctx.fillRect(minX, minY, width, height);
+        ctx.setLineDash([]);
     }
     update();
     requestAnimationFrame(render);
