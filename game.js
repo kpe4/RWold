@@ -731,7 +731,7 @@ window.addEventListener('mousedown', (e) => {
                     if (ent.lastRightClickTimes.length >= 5) {
                         state.popups.push({
                             entityId: ent.id,
-                            message: 'Да ты зае...',
+                            message: 'Я очень устал босс...',
                             x: ent.x,
                             y: ent.y,
                             createdAt: now,
