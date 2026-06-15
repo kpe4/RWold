@@ -78,7 +78,8 @@ const TILE_TYPES = {
     STONE: { color: '#757575', name: 'Stone', solid: true, harvestable: 'stone' },
     SAND: { color: '#c2b280', name: 'Sand', moveCost: 1.5 },
     WALL: { color: '#424242', name: 'Wall', solid: true },
-    TREE: { color: 'rgb(95, 94, 40)', name: 'Tree', solid: true, harvestable: 'wood' }
+    TREE: { color: 'rgb(95, 94, 40)', name: 'Tree', solid: true, harvestable: 'wood' },
+    BRIDGE: { color: '#8B4513', name: 'Bridge', moveCost: 1.5 }
 };
 
 const Noise = {
@@ -247,119 +248,95 @@ function initMap() {
         }
         state.map.chunks.push(row);
     }
-    const generateOreVein = (startX, startY) => {
-        const veinSize = Math.floor(Math.random() * 4) + 2; 
-        const veinTiles = new Set();
-        veinTiles.add(`${startX},${startY}`);
-        const directions = [
-            { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
-            { dx: 0, dy: 1 }, { dx: 0, dy: -1 }
-        ];
-        
-        for (let i = 1; i < veinSize; i++) {
-            const currentTiles = Array.from(veinTiles).map(t => t.split(',').map(Number));
-            let foundNext = false;
-            
-            for (let tries = 0; tries < 50 && !foundNext; tries++) {
-                const [cx, cy] = currentTiles[Math.floor(Math.random() * currentTiles.length)];
-                const dir = directions[Math.floor(Math.random() * directions.length)];
-                const nx = cx + dir.dx;
-                const ny = cy + dir.dy;
-                
-                if (nx >= 0 && nx < state.map.width && ny >= 0 && ny < state.map.height) {
-                    const tile = state.map.tiles[ny][nx];
-                    const key = `${nx},${ny}`;
-                    
-                    if (tile.type === TILE_TYPES.SOIL && !veinTiles.has(key)) {
-                        veinTiles.add(key);
-                        foundNext = true;
-                    }
-                }
-            }
-        }
-        
-        return Array.from(veinTiles).map(t => t.split(',').map(Number));
-    };
+    // Generate stone deposits (rare, large deposits)
+    const stoneNoiseScale = 0.025; // Larger scale = bigger, rarer deposits
+    const stonePositions = new Set();
     
-    const soilPositions = [];
-    for (let y = 0; y < state.map.height; y++) {
-        for (let x = 0; x < state.map.width; x++) {
-            if (state.map.tiles[y][x].type === TILE_TYPES.SOIL) {
-                soilPositions.push({ x, y });
-            }
-        }
-    }
-    
-    const usedPositions = new Set();
-    for (let i = 0; i < 50; i++) {
-        if (soilPositions.length === 0) break;
-        
-        const randomIndex = Math.floor(Math.random() * soilPositions.length);
-        const startPos = soilPositions[randomIndex];
-        const key = `${startPos.x},${startPos.y}`;
-        
-        if (!usedPositions.has(key)) {
-            const vein = generateOreVein(startPos.x, startPos.y);
-            vein.forEach(([x, y]) => {
-                state.map.tiles[y][x].type = TILE_TYPES.STONE;
-                usedPositions.add(`${x},${y}`);
-            });
-        }
-    }
-    
-    // Generate Forest biome with trees
-    const forestPositions = [];
     for (let y = 0; y < state.map.height; y++) {
         for (let x = 0; x < state.map.width; x++) {
             const tile = state.map.tiles[y][x];
-            if (tile.type === TILE_TYPES.GRASS || tile.type === TILE_TYPES.DARK_GRASS) {
-                // Check if near boundary between grass types
-                let hasDifferentGrassNeighbor = false;
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        if (dx === 0 && dy === 0) continue;
-                        const nx = x + dx;
-                        const ny = y + dy;
-                        if (nx >= 0 && nx < state.map.width && ny >= 0 && ny < state.map.height) {
-                            const neighborTile = state.map.tiles[ny][nx];
-                            if ((tile.type === TILE_TYPES.GRASS && neighborTile.type === TILE_TYPES.DARK_GRASS) ||
-                                (tile.type === TILE_TYPES.DARK_GRASS && neighborTile.type === TILE_TYPES.GRASS)) {
-                                hasDifferentGrassNeighbor = true;
+            if (tile.type === TILE_TYPES.SOIL) {
+                // Use noise to determine stone density
+                const stoneValue = Noise.fbm(x * stoneNoiseScale + 10000, y * stoneNoiseScale + 10000, 3);
+                
+                // Higher noise = more stone
+                let stoneChance = 0;
+                if (stoneValue > 0.78) {
+                    stoneChance = 0.7; // Dense deposit
+                } else if (stoneValue > 0.68) {
+                    stoneChance = 0.5; // Medium deposit
+                } else if (stoneValue > 0.58) {
+                    stoneChance = 0.25; // Sparse deposit
+                }
+                
+                if (Math.random() < stoneChance) {
+                    const key = `${x},${y}`;
+                    
+                    // Check if there are no stone too close
+                    let canPlaceStone = true;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const checkKey = `${x + dx},${y + dy}`;
+                            if (stonePositions.has(checkKey)) {
+                                canPlaceStone = false;
+                                break;
                             }
                         }
+                        if (!canPlaceStone) break;
                     }
-                }
-                if (hasDifferentGrassNeighbor || Math.random() < 0.1) {
-                    forestPositions.push({ x, y });
+                    
+                    if (canPlaceStone) {
+                        stonePositions.add(key);
+                        state.map.tiles[y][x].type = TILE_TYPES.STONE;
+                    }
                 }
             }
         }
     }
     
+    // Generate Forest biome with trees (rare forests)
+    const treeNoiseScale = 0.02; // Larger scale = bigger, rarer forests
     const treePositions = new Set();
-    for (let i = 0; i < 100; i++) {
-        if (forestPositions.length === 0) break;
-        
-        const randomIndex = Math.floor(Math.random() * forestPositions.length);
-        const pos = forestPositions[randomIndex];
-        const key = `${pos.x},${pos.y}`;
-        
-        // Check if there are no trees nearby (at least 1 tile gap)
-        let canPlaceTree = true;
-        for (let dy = -2; dy <= 2; dy++) {
-            for (let dx = -2; dx <= 2; dx++) {
-                const checkKey = `${pos.x + dx},${pos.y + dy}`;
-                if (treePositions.has(checkKey)) {
-                    canPlaceTree = false;
-                    break;
+    
+    for (let y = 0; y < state.map.height; y++) {
+        for (let x = 0; x < state.map.width; x++) {
+            const tile = state.map.tiles[y][x];
+            if (tile.type === TILE_TYPES.GRASS || tile.type === TILE_TYPES.DARK_GRASS || tile.type === TILE_TYPES.LIGHT_GRASS) {
+                // Use noise to determine forest density
+                const forestValue = Noise.fbm(x * treeNoiseScale + 8000, y * treeNoiseScale + 8000, 3);
+                
+                // Higher noise = more trees (rare forests)
+                let treeChance = 0;
+                if (forestValue > 0.75) {
+                    treeChance = 0.6; // Dense forest
+                } else if (forestValue > 0.65) {
+                    treeChance = 0.4; // Medium forest
+                } else if (forestValue > 0.55) {
+                    treeChance = 0.2; // Sparse forest
+                }
+                
+                if (Math.random() < treeChance) {
+                    const key = `${x},${y}`;
+                    
+                    // Check if there are no trees too close
+                    let canPlaceTree = true;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const checkKey = `${x + dx},${y + dy}`;
+                            if (treePositions.has(checkKey)) {
+                                canPlaceTree = false;
+                                break;
+                            }
+                        }
+                        if (!canPlaceTree) break;
+                    }
+                    
+                    if (canPlaceTree) {
+                        treePositions.add(key);
+                        state.map.tiles[y][x].type = TILE_TYPES.TREE;
+                    }
                 }
             }
-            if (!canPlaceTree) break;
-        }
-        
-        if (canPlaceTree) {
-            treePositions.add(key);
-            state.map.tiles[pos.y][pos.x].type = TILE_TYPES.TREE;
         }
     }
     
@@ -417,7 +394,7 @@ function updateChunk(chunk) {
             let color = 'rgba(0,0,0,0)';
             if (gy >= 0 && gy < state.map.height && gx >= 0 && gx < state.map.width) {
                 const tile = state.map.tiles[gy][gx];
-                if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER) {
+                if (tile.type === TILE_TYPES.WATER || tile.type === TILE_TYPES.DEEP_WATER || tile.type === TILE_TYPES.BRIDGE) {
                     color = getWaterColor(tile.shoreDist || 0);
                 } else {
                     color = tile.type.color;
@@ -580,6 +557,21 @@ function updateChunk(chunk) {
                         ctx.closePath();
                         ctx.fill();
                     }
+                } else if (tile.type === TILE_TYPES.BRIDGE) {
+                    // Draw bridge
+                    ctx.fillStyle = '#8B4513';
+                    ctx.fillRect(lx * ts + ts * 0.1, ly * ts + ts * 0.3, ts * 0.8, ts * 0.4);
+                    
+                    // Draw planks
+                    ctx.fillStyle = '#A0522D';
+                    for (let i = 0; i < 3; i++) {
+                        ctx.fillRect(lx * ts + ts * 0.15 + i * ts * 0.25, ly * ts + ts * 0.35, ts * 0.15, ts * 0.3);
+                    }
+                    
+                    // Draw rails
+                    ctx.fillStyle = '#654321';
+                    ctx.fillRect(lx * ts + ts * 0.1, ly * ts + ts * 0.25, ts * 0.8, ts * 0.1);
+                    ctx.fillRect(lx * ts + ts * 0.1, ly * ts + ts * 0.65, ts * 0.8, ts * 0.1);
                 }
             }
         }
@@ -652,6 +644,7 @@ function isWalkable(tx, ty) {
     if (tx < 0 || tx >= state.map.width || ty < 0 || ty >= state.map.height) return false;
     const tile = state.map.tiles[ty][tx];
     if (tile.type.solid) return false;
+    if (tile.type === TILE_TYPES.BRIDGE) return true;
     if (tile.type === TILE_TYPES.WATER) {
         const neighbors = [{x: tx-1, y: ty}, {x: tx+1, y: ty}, {x: tx, y: ty-1}, {x: tx, y: ty+1}];
         return neighbors.some(n => {
@@ -748,6 +741,7 @@ function tryPlaceJob(mouseX, mouseY) {
     if (tx >= 0 && tx < state.map.width && ty >= 0 && ty < state.map.height) {
         let jobType = null;
         if (state.currentOrder === 'architect') jobType = 'build_wall';
+        else if (state.currentOrder === 'bridge') jobType = 'build_bridge';
         else if (state.currentOrder === 'mine') jobType = 'mine';
         else if (state.currentOrder === 'chop') jobType = 'chop';
         else if (state.currentOrder === 'unarchitect') jobType = 'destruct';
@@ -766,6 +760,10 @@ function tryPlaceJob(mouseX, mouseY) {
                 state.resources.stone += 12;
                 updateResourceUI();
             }
+            if (removedJob.type === 'build_bridge') {
+                state.resources.wood += 10;
+                updateResourceUI();
+            }
         } else {
             let job = null;
             if (state.currentOrder === 'architect' && state.map.tiles[ty][tx].type !== TILE_TYPES.WALL) {
@@ -775,9 +773,16 @@ function tryPlaceJob(mouseX, mouseY) {
                     job = { type: 'build_wall', x: tx, y: ty, progress: 0, assigned: false };
                 }
             }
+            else if (state.currentOrder === 'bridge' && state.map.tiles[ty][tx].type === TILE_TYPES.WATER && state.map.tiles[ty][tx].type !== TILE_TYPES.BRIDGE) {
+                if (state.resources.wood >= 10) {
+                    state.resources.wood -= 10;
+                    updateResourceUI();
+                    job = { type: 'build_bridge', x: tx, y: ty, progress: 0, assigned: false };
+                }
+            }
             else if (state.currentOrder === 'mine' && state.map.tiles[ty][tx].type === TILE_TYPES.STONE) job = { type: 'mine', x: tx, y: ty, progress: 0, assigned: false };
             else if (state.currentOrder === 'chop' && state.map.tiles[ty][tx].type === TILE_TYPES.TREE) job = { type: 'chop', x: tx, y: ty, progress: 0, assigned: false };
-            else if (state.currentOrder === 'unarchitect' && state.map.tiles[ty][tx].type === TILE_TYPES.WALL) job = { type: 'destruct', x: tx, y: ty, progress: 0, assigned: false };
+            else if (state.currentOrder === 'unarchitect' && (state.map.tiles[ty][tx].type === TILE_TYPES.WALL || state.map.tiles[ty][tx].type === TILE_TYPES.BRIDGE)) job = { type: 'destruct', x: tx, y: ty, progress: 0, assigned: false };
             if (job) { 
                 state.jobs.push(job); 
                 state.selectedEntities.forEach(ent => {
@@ -1248,6 +1253,7 @@ function update() {
                     if (ent.job.progress >= 100) {
                         const job = ent.job; const tx = job.x; const ty = job.y;
                         if (job.type === 'build_wall') state.map.tiles[ty][tx].type = TILE_TYPES.WALL;
+                        else if (job.type === 'build_bridge') state.map.tiles[ty][tx].type = TILE_TYPES.BRIDGE;
                         else if (job.type === 'mine') { 
                             state.map.tiles[ty][tx].type = TILE_TYPES.SOIL; 
                             const stoneGain = Math.floor(Math.random() * 16) + 81;
@@ -1272,8 +1278,13 @@ function update() {
                             updateResourceUI();
                         }
                         else if (job.type === 'destruct') {
-                            state.map.tiles[ty][tx].type = TILE_TYPES.SOIL;
-                            state.resources.stone += 6; 
+                            if (state.map.tiles[ty][tx].type === TILE_TYPES.BRIDGE) {
+                                state.map.tiles[ty][tx].type = TILE_TYPES.WATER;
+                                state.resources.wood += 5;
+                            } else {
+                                state.map.tiles[ty][tx].type = TILE_TYPES.SOIL;
+                                state.resources.stone += 6; 
+                            }
                             updateResourceUI();
                         }
                         state.map.chunks[Math.floor(ty / state.map.chunkSize)][Math.floor(tx / state.map.chunkSize)].dirty = true;
@@ -1394,13 +1405,15 @@ function render() {
         
         ctx.restore();
     });
-    if (state.currentOrder === 'architect' || state.currentOrder === 'unarchitect' || state.currentOrder === 'mine' || state.currentOrder === 'chop') {
+    if (state.currentOrder === 'architect' || state.currentOrder === 'bridge' || state.currentOrder === 'unarchitect' || state.currentOrder === 'mine' || state.currentOrder === 'chop') {
         const mouseWorld = screenToWorld(state.camera.lastMouseX, state.camera.lastMouseY);
         const tx = Math.floor(mouseWorld.x / state.map.tileSize);
         const ty = Math.floor(mouseWorld.y / state.map.tileSize);
         if (tx >= 0 && tx < state.map.width && ty >= 0 && ty < state.map.height) {
             if (state.currentOrder === 'architect') {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            } else if (state.currentOrder === 'bridge') {
+                ctx.fillStyle = 'rgba(139, 69, 19, 0.3)';
             } else if (state.currentOrder === 'mine') {
                 ctx.fillStyle = 'rgba(255, 165, 0, 0.3)';
             } else if (state.currentOrder === 'chop') {
@@ -1416,6 +1429,9 @@ function render() {
         if (job.type === 'build_wall') {
             ctx.setLineDash([5, 5]);
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        } else if (job.type === 'build_bridge') {
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = 'rgba(139, 69, 19, 0.5)';
         } else if (job.type === 'mine') {
             ctx.setLineDash([3, 3]);
             ctx.strokeStyle = 'rgba(255, 165, 0, 0.5)';
@@ -1431,6 +1447,8 @@ function render() {
         if (job.progress > 0) {
             if (job.type === 'build_wall') {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            } else if (job.type === 'build_bridge') {
+                ctx.fillStyle = 'rgba(139, 69, 19, 0.3)';
             } else if (job.type === 'mine') {
                 ctx.fillStyle = 'rgba(255, 165, 0, 0.3)';
             } else if (job.type === 'chop') {
@@ -1564,7 +1582,7 @@ window.setOrder = function(type) {
     
     if (state.currentOrder === type) state.currentOrder = null;
     else state.currentOrder = type;
-    const orderNames = { 'architect': 'Architect', 'unarchitect': 'Destruct', 'chop': 'Chop', 'mine': 'Mine', 'work': 'Work' };
+    const orderNames = { 'architect': 'Architect', 'bridge': 'Bridge', 'unarchitect': 'Destruct', 'chop': 'Chop', 'mine': 'Mine', 'work': 'Work' };
     const buttons = document.querySelectorAll('#bottom-menu button');
     buttons.forEach(btn => {
         if (orderNames[type] === btn.innerText) btn.style.background = state.currentOrder === type ? '#555' : '#333';
