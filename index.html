@@ -31,7 +31,6 @@
             </div>
             <div id="bottom-menu">
                 <button onclick="setOrder('architect')">Architect</button>
-                <button onclick="setOrder('bridge')">Bridge</button>
                 <button onclick="setOrder('unarchitect')">Destruct</button>
                 <button onclick="setOrder('chop')">Chop</button>
                 <button onclick="setOrder('mine')">Mine</button>
@@ -40,6 +39,26 @@
             <div id="character-menu">
                 <div id="character-list"></div>
                 <button id="deselect-btn" onclick="deselectEntity()">Deselect</button>
+            </div>
+            <div id="architect-menu" class="hidden">
+                <h3>Build Menu</h3>
+                <div class="build-options">
+                    <button onclick="setBuildOrder('bridge')">
+                        <span class="build-icon">🌉</span>
+                        Bridge
+                        <span class="build-cost">10 Wood</span>
+                    </button>
+                    <button onclick="setBuildOrder('stone_wall')">
+                        <span class="build-icon">🧱</span>
+                        Stone Wall
+                        <span class="build-cost">12 Stone</span>
+                    </button>
+                    <button onclick="setBuildOrder('wood_wall')">
+                        <span class="build-icon">🪵</span>
+                        Wooden Wall
+                        <span class="build-cost">8 Wood</span>
+                    </button>
+                </div>
             </div>
             <div id="inspect-panel" class="hidden">
                 <h3 id="inspect-title">Colonist</h3>

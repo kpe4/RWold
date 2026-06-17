@@ -78,6 +78,7 @@ const TILE_TYPES = {
     STONE: { color: '#757575', name: 'Stone', solid: true, harvestable: 'stone' },
     SAND: { color: '#c2b280', name: 'Sand', moveCost: 1.5 },
     WALL: { color: '#424242', name: 'Wall', solid: true },
+    WOOD_WALL: { color: '#8B4513', name: 'Wooden Wall', solid: true },
     TREE: { color: 'rgb(95, 94, 40)', name: 'Tree', solid: true, harvestable: 'wood' },
     BRIDGE: { color: '#8B4513', name: 'Bridge', moveCost: 1.5 }
 };
@@ -503,6 +504,58 @@ function updateChunk(chunk) {
                         ctx.lineTo(lx * ts + ts, ly * ts + ts);
                         ctx.stroke();
                     }
+                } else if (tile.type === TILE_TYPES.WOOD_WALL) {
+                    // Draw wooden wall with planks
+                    ctx.fillStyle = '#6B4423';
+                    ctx.fillRect(lx * ts, ly * ts, ts, ts);
+                    
+                    // Draw vertical planks
+                    ctx.fillStyle = '#8B5A2B';
+                    for (let i = 0; i < 4; i++) {
+                        ctx.fillRect(lx * ts + i * (ts / 4) + 1, ly * ts, (ts / 4) - 2, ts);
+                    }
+                    
+                    // Draw wood grain texture
+                    ctx.fillStyle = 'rgba(93, 52, 29, 0.3)';
+                    for (let i = 0; i < 8; i++) {
+                        const xOffset = (i % 2) * 8;
+                        ctx.fillRect(lx * ts + xOffset, ly * ts + i * (ts / 8) + 4, ts - xOffset, 2);
+                    }
+                    
+                    const wallType = tile.type;
+                    const hasTopWall = gy > 0 && state.map.tiles[gy - 1][gx].type === wallType;
+                    const hasBottomWall = gy < state.map.height - 1 && state.map.tiles[gy + 1][gx].type === wallType;
+                    const hasLeftWall = gx > 0 && state.map.tiles[gy][gx - 1].type === wallType;
+                    const hasRightWall = gx < state.map.width - 1 && state.map.tiles[gy][gx + 1].type === wallType;
+                    
+                    // Darken edges that aren't connected
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+                    ctx.lineWidth = 3;
+                    
+                    if (!hasTopWall) {
+                        ctx.beginPath();
+                        ctx.moveTo(lx * ts, ly * ts);
+                        ctx.lineTo(lx * ts + ts, ly * ts);
+                        ctx.stroke();
+                    }
+                    if (!hasBottomWall) {
+                        ctx.beginPath();
+                        ctx.moveTo(lx * ts, ly * ts + ts);
+                        ctx.lineTo(lx * ts + ts, ly * ts + ts);
+                        ctx.stroke();
+                    }
+                    if (!hasLeftWall) {
+                        ctx.beginPath();
+                        ctx.moveTo(lx * ts, ly * ts);
+                        ctx.lineTo(lx * ts, ly * ts + ts);
+                        ctx.stroke();
+                    }
+                    if (!hasRightWall) {
+                        ctx.beginPath();
+                        ctx.moveTo(lx * ts + ts, ly * ts);
+                        ctx.lineTo(lx * ts + ts, ly * ts + ts);
+                        ctx.stroke();
+                    }
                 } else if (tile.type === TILE_TYPES.TREE) {
                     // Draw tree shadow first (so it appears under the tree)
                     const shadowX = lx * ts + ts * 0.1;
@@ -568,20 +621,72 @@ function updateChunk(chunk) {
                         ctx.fill();
                     }
                 } else if (tile.type === TILE_TYPES.BRIDGE) {
-                    // Draw bridge
-                    ctx.fillStyle = '#8B4513';
-                    ctx.fillRect(lx * ts + ts * 0.1, ly * ts + ts * 0.3, ts * 0.8, ts * 0.4);
+                    const baseX = lx * ts;
+                    const baseY = ly * ts;
+                    const gx = chunk.cx * state.map.chunkSize + lx;
+                    const gy = chunk.cy * state.map.chunkSize + ly;
+
+                    // Check neighbors (up, down, left, right)
+                    let connectUp = false, connectDown = false, connectLeft = false, connectRight = false;
+                    const dirs = [[0, -1, 'up'], [0, 1, 'down'], [-1, 0, 'left'], [1, 0, 'right']];
+                    dirs.forEach(([dx, dy, dir]) => {
+                        const nx = gx + dx;
+                        const ny = gy + dy;
+                        if (nx >= 0 && nx < state.map.width && ny >= 0 && ny < state.map.height) {
+                            const neighbor = state.map.tiles[ny][nx];
+                            if (neighbor.type === TILE_TYPES.BRIDGE || 
+                                (neighbor.type !== TILE_TYPES.WATER && neighbor.type !== TILE_TYPES.DEEP_WATER)) {
+                                if (dir === 'up') connectUp = true;
+                                if (dir === 'down') connectDown = true;
+                                if (dir === 'left') connectLeft = true;
+                                if (dir === 'right') connectRight = true;
+                            }
+                        }
+                    });
+
+                    // Draw center post
+                    ctx.fillStyle = '#5D3A1A';
+                    ctx.fillRect(baseX + ts * 0.35, baseY + ts * 0.35, ts * 0.3, ts * 0.3);
+
+                    // Draw connections in all directions
+                    ctx.fillStyle = '#8B5A2B';
                     
+                    // Up connection
+                    if (connectUp) ctx.fillRect(baseX + ts * 0.35, baseY, ts * 0.3, ts * 0.35);
+                    // Down connection
+                    if (connectDown) ctx.fillRect(baseX + ts * 0.35, baseY + ts * 0.65, ts * 0.3, ts * 0.35);
+                    // Left connection
+                    if (connectLeft) ctx.fillRect(baseX, baseY + ts * 0.35, ts * 0.35, ts * 0.3);
+                    // Right connection
+                    if (connectRight) ctx.fillRect(baseX + ts * 0.65, baseY + ts * 0.35, ts * 0.35, ts * 0.3);
+
                     // Draw planks
-                    ctx.fillStyle = '#A0522D';
-                    for (let i = 0; i < 3; i++) {
-                        ctx.fillRect(lx * ts + ts * 0.15 + i * ts * 0.25, ly * ts + ts * 0.35, ts * 0.15, ts * 0.3);
-                    }
+                    ctx.fillStyle = '#A67C52';
                     
-                    // Draw rails
-                    ctx.fillStyle = '#654321';
-                    ctx.fillRect(lx * ts + ts * 0.1, ly * ts + ts * 0.25, ts * 0.8, ts * 0.1);
-                    ctx.fillRect(lx * ts + ts * 0.1, ly * ts + ts * 0.65, ts * 0.8, ts * 0.1);
+                    // Up planks
+                    if (connectUp) {
+                        for (let i = 0; i < 2; i++) {
+                            ctx.fillRect(baseX + ts * 0.37 + i * ts * 0.14, baseY + ts * 0.05, ts * 0.1, ts * 0.45);
+                        }
+                    }
+                    // Down planks
+                    if (connectDown) {
+                        for (let i = 0; i < 2; i++) {
+                            ctx.fillRect(baseX + ts * 0.37 + i * ts * 0.14, baseY + ts * 0.5, ts * 0.1, ts * 0.45);
+                        }
+                    }
+                    // Left planks
+                    if (connectLeft) {
+                        for (let i = 0; i < 2; i++) {
+                            ctx.fillRect(baseX + ts * 0.05, baseY + ts * 0.37 + i * ts * 0.14, ts * 0.45, ts * 0.1);
+                        }
+                    }
+                    // Right planks
+                    if (connectRight) {
+                        for (let i = 0; i < 2; i++) {
+                            ctx.fillRect(baseX + ts * 0.5, baseY + ts * 0.37 + i * ts * 0.14, ts * 0.45, ts * 0.1);
+                        }
+                    }
                 }
             }
         }
@@ -778,17 +883,34 @@ function tryPlaceJob(mouseX, mouseY) {
                 state.resources.stone += 12;
                 updateResourceUI();
             }
+            if (removedJob.type === 'build_wood_wall') {
+                state.resources.wood += 8;
+                updateResourceUI();
+            }
             if (removedJob.type === 'build_bridge') {
                 state.resources.wood += 10;
                 updateResourceUI();
             }
         } else {
             let job = null;
-            if (state.currentOrder === 'architect' && state.map.tiles[ty][tx].type !== TILE_TYPES.WALL && state.map.tiles[ty][tx].type !== TILE_TYPES.STONE) {
-                if (state.resources.stone >= 12) {
-                    state.resources.stone -= 12;
-                    updateResourceUI();
-                    job = { type: 'build_wall', x: tx, y: ty, progress: 0, assigned: false };
+            if (state.currentOrder === 'architect') {
+                if (!state.buildType) {
+                    // Default to stone wall if no build type selected
+                    state.buildType = 'stone_wall';
+                }
+                
+                if (state.buildType === 'stone_wall' && state.map.tiles[ty][tx].type !== TILE_TYPES.WALL && state.map.tiles[ty][tx].type !== TILE_TYPES.STONE && state.map.tiles[ty][tx].type !== TILE_TYPES.WATER && state.map.tiles[ty][tx].type !== TILE_TYPES.DEEP_WATER) {
+                    if (state.resources.stone >= 12) {
+                        state.resources.stone -= 12;
+                        updateResourceUI();
+                        job = { type: 'build_wall', x: tx, y: ty, progress: 0, assigned: false };
+                    }
+                } else if (state.buildType === 'wood_wall' && state.map.tiles[ty][tx].type !== TILE_TYPES.WALL && state.map.tiles[ty][tx].type !== TILE_TYPES.WOOD_WALL && state.map.tiles[ty][tx].type !== TILE_TYPES.STONE && state.map.tiles[ty][tx].type !== TILE_TYPES.WATER && state.map.tiles[ty][tx].type !== TILE_TYPES.DEEP_WATER) {
+                    if (state.resources.wood >= 8) {
+                        state.resources.wood -= 8;
+                        updateResourceUI();
+                        job = { type: 'build_wood_wall', x: tx, y: ty, progress: 0, assigned: false };
+                    }
                 }
             }
             else if (state.currentOrder === 'bridge' && state.map.tiles[ty][tx].type === TILE_TYPES.WATER && state.map.tiles[ty][tx].type !== TILE_TYPES.BRIDGE && state.map.tiles[ty][tx].type !== TILE_TYPES.STONE) {
@@ -800,7 +922,7 @@ function tryPlaceJob(mouseX, mouseY) {
             }
             else if (state.currentOrder === 'mine' && state.map.tiles[ty][tx].type === TILE_TYPES.STONE) job = { type: 'mine', x: tx, y: ty, progress: 0, assigned: false };
             else if (state.currentOrder === 'chop' && state.map.tiles[ty][tx].type === TILE_TYPES.TREE) job = { type: 'chop', x: tx, y: ty, progress: 0, assigned: false };
-            else if (state.currentOrder === 'unarchitect' && (state.map.tiles[ty][tx].type === TILE_TYPES.WALL || state.map.tiles[ty][tx].type === TILE_TYPES.BRIDGE)) job = { type: 'destruct', x: tx, y: ty, progress: 0, assigned: false };
+            else if (state.currentOrder === 'unarchitect' && (state.map.tiles[ty][tx].type === TILE_TYPES.WALL || state.map.tiles[ty][tx].type === TILE_TYPES.WOOD_WALL || state.map.tiles[ty][tx].type === TILE_TYPES.BRIDGE)) job = { type: 'destruct', x: tx, y: ty, progress: 0, assigned: false };
             if (job) { 
                 state.jobs.push(job); 
                 state.selectedEntities.forEach(ent => {
@@ -816,7 +938,7 @@ function tryPlaceJob(mouseX, mouseY) {
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 
 window.addEventListener('mousedown', (e) => {
-    if (e.target.closest('#top-bar') || e.target.closest('#bottom-menu') || e.target.closest('#inspect-panel') || e.target.closest('#character-menu') || e.target.closest('#regen-btn')) return;
+    if (e.target.closest('#top-bar') || e.target.closest('#bottom-menu') || e.target.closest('#inspect-panel') || e.target.closest('#character-menu') || e.target.closest('#regen-btn') || e.target.closest('#architect-menu')) return;
     if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
         state.camera.isDragging = true;
         state.camera.lastMouseX = e.clientX; state.camera.lastMouseY = e.clientY;
@@ -1265,6 +1387,7 @@ function update() {
                     if (ent.job.progress >= 100) {
                         const job = ent.job; const tx = job.x; const ty = job.y;
                         if (job.type === 'build_wall') state.map.tiles[ty][tx].type = TILE_TYPES.WALL;
+                        else if (job.type === 'build_wood_wall') state.map.tiles[ty][tx].type = TILE_TYPES.WOOD_WALL;
                         else if (job.type === 'build_bridge') state.map.tiles[ty][tx].type = TILE_TYPES.BRIDGE;
                         else if (job.type === 'mine') { 
                             state.map.tiles[ty][tx].type = TILE_TYPES.SOIL; 
@@ -1284,6 +1407,9 @@ function update() {
                             if (state.map.tiles[ty][tx].type === TILE_TYPES.BRIDGE) {
                                 state.map.tiles[ty][tx].type = TILE_TYPES.WATER;
                                 state.resources.wood += 5;
+                            } else if (state.map.tiles[ty][tx].type === TILE_TYPES.WOOD_WALL) {
+                                state.map.tiles[ty][tx].type = TILE_TYPES.GRASS;
+                                state.resources.wood += 4;
                             } else {
                                 state.map.tiles[ty][tx].type = TILE_TYPES.SOIL;
                                 state.resources.stone += 6; 
@@ -1541,14 +1667,56 @@ window.setOrder = function(type) {
         });
         return;
     }
+
+    if (type === 'architect') {
+        // Toggle architect menu
+        const menu = document.getElementById('architect-menu');
+        if (state.currentOrder === 'architect') {
+            state.currentOrder = null;
+            menu.classList.add('hidden');
+        } else {
+            state.currentOrder = 'architect';
+            menu.classList.remove('hidden');
+        }
+    } else {
+        // Hide architect menu for other orders
+        document.getElementById('architect-menu').classList.add('hidden');
+        if (state.currentOrder === type) state.currentOrder = null;
+        else state.currentOrder = type;
+    }
     
-    if (state.currentOrder === type) state.currentOrder = null;
-    else state.currentOrder = type;
-    const orderNames = { 'architect': 'Architect', 'bridge': 'Bridge', 'unarchitect': 'Destruct', 'chop': 'Chop', 'mine': 'Mine', 'work': 'Work' };
+    const orderNames = { 'architect': 'Architect', 'unarchitect': 'Destruct', 'chop': 'Chop', 'mine': 'Mine', 'work': 'Work' };
     const buttons = document.querySelectorAll('#bottom-menu button');
     buttons.forEach(btn => {
         if (orderNames[type] === btn.innerText) btn.style.background = state.currentOrder === type ? '#555' : '#333';
         else btn.style.background = '#333';
+    });
+};
+
+window.setBuildOrder = function(buildType) {
+    state.lastPaintedTile = null;
+    document.getElementById('architect-menu').classList.add('hidden');
+    
+    // Set the build order
+    if (buildType === 'bridge') {
+        state.currentOrder = 'bridge';
+    } else if (buildType === 'stone_wall') {
+        state.currentOrder = 'architect';
+        // We'll use a special state to track we're building stone walls
+        state.buildType = 'stone_wall';
+    } else if (buildType === 'wood_wall') {
+        state.currentOrder = 'architect';
+        state.buildType = 'wood_wall';
+    }
+    
+    // Update button states
+    const buttons = document.querySelectorAll('#bottom-menu button');
+    buttons.forEach(btn => {
+        btn.style.background = '#333';
+    });
+    // Highlight Architect button
+    buttons.forEach(btn => {
+        if (btn.innerText === 'Architect') btn.style.background = '#555';
     });
 };
 window.addEventListener('resize', resize);
