@@ -10,6 +10,7 @@
     --dota-font-title: 'Cinzel', serif;
     --dota-shadow: 0 0 25px rgba(0, 0, 0, 0.9), inset 0 0 30px rgba(0,0,0,0.4);
     --dota-inner-glow: inset 0 0 12px rgba(197, 164, 85, 0.08);
+    --ui-scale: 0.75; /* Масштаб интерфейса (0.75 = полтора раза больше, чем 0.5) */
 }
 
 * {
@@ -28,7 +29,6 @@ body, html {
     text-transform: uppercase;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Always hide default cursor, we use custom */
     cursor: none !important;
 }
 
@@ -49,16 +49,18 @@ body, html {
 
 #custom-cursor {
     position: fixed;
-    pointer-events: none;
+    pointer-events: none !important;
     z-index: 99999;
     background-size: 100% 100%;
     background-repeat: no-repeat;
     background-position: center;
-    /* Improve quality for high-DPI displays */
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
     image-rendering: auto;
     display: none;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
 }
 
 /* Default cursor */
@@ -112,180 +114,60 @@ body, html {
     pointer-events: none;
 }
 
-#ui-overlay.ui-hidden #regen-btn {
-    transform: translate(-100px, -100px);
-    opacity: 0;
-}
-
-#ui-overlay.ui-hidden #top-bar {
-    transform: translateX(-50%) translateY(-100px);
-    opacity: 0;
-}
-
-#ui-overlay.ui-hidden #bottom-menu {
-    transform: translateX(-50%) translateY(100px);
-    opacity: 0;
-}
-
-
-
-#ui-overlay.ui-hidden #character-menu {
-    transform: translate(100px, 100px);
-    opacity: 0;
-}
-
-#ui-overlay.ui-hidden #inspect-panel {
-    transform: translateX(-100px);
-    opacity: 0;
-}
-
-#top-bar {
-    position: absolute; 
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 1400px;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    box-sizing: border-box;
-    padding: 0 20px;
-    pointer-events: none;
+/* Regen Button (Top Left with small gap) */
+#regen-btn {
+    position: absolute;
+    top: 20px;
+    left: 20px;
     z-index: 100;
+    background: linear-gradient(180deg, #4a1a1a 0%, #2a0a0a 100%);
+    border: 1px solid var(--dota-red);
+    border-top: 1px solid #c73333;
+    border-radius: 3px;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+    overflow: hidden;
+    padding: 11px 24px;
+    font-family: var(--dota-font-title);
+    letter-spacing: 1.2px;
+    font-size: 13px;
+    transform: scale(var(--ui-scale));
+    transform-origin: top left;
 }
 
-#top-bar > div {
-    pointer-events: auto;
-}
-
-.hud-left, .hud-right {
-    background: linear-gradient(180deg, rgba(20, 22, 24, 0.98) 0%, rgba(10, 12, 13, 0.95) 100%);
-    border: 2px solid var(--dota-border);
-    border-top: none;
-    padding: 8px 25px;
-    height: 50px;
-    display: flex;
-    align-items: center;
-    box-shadow: var(--dota-shadow);
-    position: relative;
-    min-width: 280px;
-}
-
-.hud-left {
-    border-radius: 0 0 15px 0;
-    clip-path: polygon(0 0, 100% 0, 95% 100%, 0% 100%);
-    border-left: none;
-    left: -20px;
-}
-
-.hud-right {
-    border-radius: 0 0 0 15px;
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 5% 100%);
-    border-right: none;
-    right: -20px;
-}
-
-.hud-left::after, .hud-right::after {
+#regen-btn::before {
     content: '';
     position: absolute;
-    bottom: 0;
-    left: 0;
+    top: 0;
+    left: -100%;
     width: 100%;
-    height: 2px;
-    background: var(--dota-gold);
-    box-shadow: 0 0 10px var(--dota-gold);
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+    transition: left 0.4s ease;
 }
 
-.hud-center {
-    display: flex;
-    justify-content: center;
-    position: relative;
-    z-index: 10;
+#regen-btn:hover::before {
+    left: 100%;
 }
 
-#resources, #resources-right {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    width: 100%;
+#regen-btn:hover {
+    background: linear-gradient(180deg, #5a2a2a 0%, #3a1a1a 100%);
+    border-color: #d73a3a;
+    box-shadow: 0 0 15px rgba(167, 41, 41, 0.3);
 }
 
-.hud-left #resources {
-    justify-content: flex-start;
-    padding-right: 20px;
-}
-
-.hud-right #resources-right {
-    justify-content: flex-end;
-    padding-left: 20px;
-}
-
-.res-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: rgba(0, 0, 0, 0.4);
-    padding: 4px 12px;
-    border-radius: 4px;
-    border: 1px solid rgba(197, 164, 85, 0.2);
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-    transition: all 0.3s ease;
-}
-
-.res-item:hover {
-    border-color: var(--dota-gold);
-    background: rgba(197, 164, 85, 0.05);
-}
-
-.res-icon {
-    font-size: 18px;
-    filter: drop-shadow(0 0 5px rgba(0,0,0,0.8));
-}
-
-#resources span, #resources-right span {
-    color: #fff;
-    font-family: var(--dota-font-main);
-    font-weight: 700;
-    font-size: 18px;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-    letter-spacing: 0.5px;
-}
-
-/* Counter styles like slot machines */
-.counter-container {
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-    height: 26px;
-}
-
-.counter-digit {
-    font-family: var(--dota-font-main);
-    font-weight: 700;
-    font-size: 18px;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-    display: inline-block;
-    min-width: 14px;
-    text-align: center;
-    line-height: 26px;
-    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Colors for resources */
-#silver-count .counter-digit { color: #e5c16f !important; }
-#stone-count .counter-digit { color: #aaa !important; }
-#wood-count .counter-digit { color: #a67c52 !important; }
-#gold-count .counter-digit { color: #FFD700 !important; }
-#food-count .counter-digit { color: #81c784 !important; }
-
+/* Time Container (Center Top) */
 #time-container {
+    position: absolute;
+    top: 0;
+    left: 50%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    position: relative;
-    top: 0;
+    z-index: 100;
     filter: drop-shadow(0 5px 15px rgba(0,0,0,0.8));
+    transform: translateX(-50%) scale(var(--ui-scale));
+    transform-origin: top center;
 }
 
 .time-icons-wrapper {
@@ -299,7 +181,7 @@ body, html {
     z-index: 5;
     background: radial-gradient(circle, #1a1c1e 0%, #0a0b0c 100%);
     border-radius: 50%;
-    border: 3px solid var(--dota-gold);
+    border: 3px solid rgb(200, 165, 80);
     box-shadow: 0 0 20px rgba(0,0,0,0.8), inset 0 0 15px rgba(197,164,85,0.3);
 }
 
@@ -331,8 +213,10 @@ body, html {
     color: var(--dota-gold-bright);
     background: linear-gradient(180deg, #1a1a1a 0%, #000 100%);
     padding: 35px 40px 10px 40px;
-    border: 2px solid var(--dota-gold);
+    border-bottom: 2px solid rgb(200, 165, 80);
     border-top: none;
+    border-left: none;
+    border-right: none;
     border-radius: 0 0 20px 20px;
     font-size: 18px;
     letter-spacing: 2px;
@@ -342,35 +226,90 @@ body, html {
     clip-path: polygon(0 0, 100% 0, 90% 100%, 10% 100%);
 }
 
-#top-bar::after {
-    display: none;
-}
-
-#bottom-menu {
+/* All Resources HUD (Top Right, tight to corner) */
+#hud-right {
     position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: auto;
-    background: var(--dota-panel);
+    top: 0;
+    right: 0;
+    background: linear-gradient(180deg, rgba(20, 22, 24, 0.98) 0%, rgba(10, 12, 13, 0.95) 100%);
+    border-bottom: 2px solid rgb(200, 165, 80);
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    padding: 8px 25px 8px 40px; /* Увеличим отступ слева для трапеции */
     display: flex;
-    justify-content: center;
-    padding: 18px 35px 20px 35px;
-    gap: 18px;
-    border: 2px solid var(--dota-border);
-    border-bottom: none;
-    border-radius: 8px 8px 0 0;
+    align-items: center;
     box-shadow: var(--dota-shadow);
-    border-top: 2px solid #4a4a4a;
+    border-radius: 0;
+    /* Обратный трапециевидный левый край */
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 30px 100%);
+    transform: scale(var(--ui-scale));
+    transform-origin: top right;
 }
 
+#resources {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+}
+
+.res-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: 1px solid rgba(197, 164, 85, 0.2);
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+    transition: all 0.3s ease;
+}
+
+.res-item:hover {
+    border-color: var(--dota-gold);
+    background: rgba(197, 164, 85, 0.05);
+}
+
+.res-icon {
+    font-size: 18px;
+    filter: drop-shadow(0 0 5px rgba(0,0,0,0.8));
+}
+
+/* Counter styles like slot machines */
+.counter-container {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    height: 26px;
+}
+
+.counter-digit {
+    font-family: var(--dota-font-main);
+    font-weight: 700;
+    font-size: 18px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    display: inline-block;
+    min-width: 14px;
+    text-align: center;
+    line-height: 26px;
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Colors for resources */
+#silver-count .counter-digit { color: #e5c16f !important; }
+#stone-count .counter-digit { color: #aaa !important; }
+#wood-count .counter-digit { color: #a67c52 !important; }
+#gold-count .counter-digit { color: #FFD700 !important; }
+#food-count .counter-digit { color: #81c784 !important; }
+
+/* Buttons */
 button {
     background: linear-gradient(180deg, #2d2d2d 0%, #1a1a1a 100%);
     color: #cccccc;
     border: 1px solid #4a4a4a;
     border-top: 1px solid #5a5a5a;
     padding: 12px 30px;
-    cursor: pointer;
     font-family: var(--dota-font-main);
     font-size: 14px;
     font-weight: 600;
@@ -426,6 +365,7 @@ button:hover::after {
     box-shadow: 0 0 8px var(--dota-gold);
 }
 
+/* Inspect Panel */
 #inspect-panel {
     position: absolute;
     bottom: 140px;
@@ -439,7 +379,7 @@ button:hover::after {
     box-shadow: var(--dota-shadow);
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     transform-origin: bottom left;
-    cursor: move;
+    transform: scale(var(--ui-scale));
 }
 
 #inspect-panel.hidden {
@@ -480,7 +420,6 @@ button:hover::after {
     color: #999;
     font-size: 18px;
     font-weight: 700;
-    cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
@@ -508,6 +447,7 @@ button:hover::after {
     cursor: grab;
     z-index: 100;
     transform-origin: bottom left;
+    transform: scale(var(--ui-scale));
 }
 
 #inspect-widget:active {
@@ -535,11 +475,13 @@ button:hover::after {
     display: none !important;
 }
 
+/* Debug Time Panel */
 #debug-time-panel {
     position: absolute;
     top: 100px;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translateX(-50%) scale(var(--ui-scale));
+    transform-origin: top center;
     background: var(--dota-panel);
     border: 1px solid var(--dota-border);
     padding: 18px 22px;
@@ -568,70 +510,25 @@ button:hover::after {
     font-size: 14px;
 }
 
-#regen-btn {
-    position: absolute;
-    top: 70px;
-    left: 45px;
-    z-index: 100;
-    background: linear-gradient(180deg, #4a1a1a 0%, #2a0a0a 100%);
-    border: 1px solid var(--dota-red);
-    border-top: 1px solid #c73333;
-    border-radius: 3px;
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
-    overflow: hidden;
-    padding: 11px 24px;
-    font-family: var(--dota-font-title);
-    letter-spacing: 1.2px;
-    font-size: 13px;
-}
-
-#regen-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-    transition: left 0.4s ease;
-}
-
-#regen-btn:hover::before {
-    left: 100%;
-}
-
-#regen-progress {
-    position: absolute;
-    top: 0;
-    right: 0;
-    height: 100%;
-    width: 0%;
-    background: rgba(255, 255, 255, 0.1);
-    pointer-events: none;
-    transition: width 0.1s linear;
-}
-
-#regen-btn:hover {
-    background: linear-gradient(180deg, #5a2a2a 0%, #3a1a1a 100%);
-    border-color: #d73a3a;
-    box-shadow: 0 0 15px rgba(167, 41, 41, 0.3);
-}
-
+/* Character Menu (Bottom Right, tight to corner) */
 #character-menu {
     position: absolute;
-    bottom: 45px;
-    right: 45px;
+    bottom: 0;
+    right: 0;
     background: var(--dota-panel);
     padding: 22px 24px;
-    border: 2px solid var(--dota-border);
-    border-top: 2px solid #4a4a4a;
-    border-radius: 4px;
+    border: 2px solid rgb(200, 165, 80);
+    border-top: 2px solid rgb(200, 165, 80);
+    border-bottom: none;
+    border-right: none;
+    border-radius: 0;
     display: flex;
     flex-direction: column;
     gap: 16px;
     min-width: 200px;
     box-shadow: var(--dota-shadow);
+    transform: scale(var(--ui-scale));
+    transform-origin: bottom right;
 }
 
 #character-list {
@@ -656,7 +553,7 @@ button:hover::after {
 .character-card:hover {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(0,0,0,0.25) 100%);
     border-color: #5a5a5a;
-    border-top-color: #6a6a6a;
+    border-top-color: #6a6a5a;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
@@ -688,46 +585,13 @@ button:hover::after {
     letter-spacing: 0.3px;
 }
 
-#deselect-btn {
-    background: linear-gradient(180deg, #333 0%, #1a1a1a 100%) !important;
-    border-color: #444 !important;
-    border-top-color: #555 !important;
-    color: #999 !important;
-    margin-top: 12px;
-}
-
-#deselect-btn:hover {
-    background: linear-gradient(180deg, #444 0%, #2a2a2a 100%) !important;
-    color: #fff !important;
-    border-color: #666 !important;
-    border-top-color: #777 !important;
-}
-
-#inspect-title {
-    font-family: var(--dota-font-title);
-    margin: 0 0 16px 0;
-    border-bottom: 1px solid var(--dota-border);
-    padding-bottom: 12px;
-    font-size: 19px;
-    color: var(--dota-gold);
-    letter-spacing: 0.5px;
-}
-
-#inspect-content {
-    line-height: 1.6;
-    font-size: 14px;
-    color: #bbb;
-}
-
-#inspect-content p {
-    margin: 6px 0;
-}
-
+/* Architect Menu */
 #architect-menu {
     position: absolute;
     bottom: 145px;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translateX(-50%) scale(var(--ui-scale));
+    transform-origin: bottom center;
     background: var(--dota-panel);
     border: 2px solid var(--dota-border);
     border-top: 2px solid #4a4a4a;
@@ -789,19 +653,25 @@ button:hover::after {
     font-size: 13px;
 }
 
+/* Action Panel (Bottom Left, tight to corner) */
 #action-panel {
     position: absolute;
-    bottom: 140px;
-    left: 45px;
+    bottom: 0;
+    left: 0;
     width: 320px;
     background: var(--dota-panel);
     border: 2px solid var(--dota-border);
     border-top: 2px solid #4a4a4a;
-    border-radius: 4px;
+    border-right: none;
+    border-bottom: none;
+    border-left: none;
+    border-radius: 0;
     box-shadow: var(--dota-shadow);
     display: flex;
     flex-direction: column;
     z-index: 500;
+    transform: scale(var(--ui-scale));
+    transform-origin: bottom left;
 }
 
 .action-panel-header {
@@ -873,26 +743,33 @@ button:hover::after {
 }
 
 .cancel-task-btn {
-    background: linear-gradient(180deg, #5a1a1a 0%, #3a0a0a 100%);
-    border: 1px solid var(--dota-red);
-    border-radius: 3px;
+    background: linear-gradient(180deg, #7a1a1a 0%, #4a0a0a 100%);
+    border: 2px solid #ff3333;
+    border-radius: 4px;
     color: #fff;
-    font-size: 18px;
-    width: 32px;
-    height: 32px;
-    cursor: pointer;
+    font-size: 20px;
+    font-weight: bold;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
+    transition: all 0.1s ease;
     position: relative;
     z-index: 1000;
+    pointer-events: auto !important;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .cancel-task-btn:hover {
-    background: linear-gradient(180deg, #7a2a2a 0%, #4a1a1a 100%);
-    box-shadow: 0 0 10px rgba(167,41,41,0.4);
-    border-color: #ff5555;
+    background: linear-gradient(180deg, #9a2a2a 0%, #6a1a1a 100%);
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.6);
+}
+
+.cancel-task-btn:active {
+    background: linear-gradient(180deg, #5a1a1a 0%, #3a0a0a 100%);
+    transform: scale(0.95);
 }
 
 .cancel-all-btn {
@@ -906,7 +783,6 @@ button:hover::after {
     font-size: 14px;
     font-weight: 700;
     text-transform: uppercase;
-    cursor: pointer;
     transition: all 0.2s ease;
     letter-spacing: 1px;
 }
@@ -919,7 +795,6 @@ button:hover::after {
 
 .cancel-all-btn:disabled {
     opacity: 0.3;
-    cursor: not-allowed;
 }
 
 ::-webkit-scrollbar {
@@ -937,4 +812,28 @@ button:hover::after {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--dota-gold);
+}
+
+/* Bottom Menu (Tight to Action Panel) */
+#bottom-menu {
+    position: absolute;
+    bottom: 0;
+    left: calc(320px * var(--ui-scale)); /* Примыкает справа к action-panel с учетом масштаба */
+    width: auto;
+    background: var(--dota-panel);
+    display: flex;
+    justify-content: center;
+    padding: 18px 45px 20px 35px; /* Увеличим отступ справа для трапеции */
+    gap: 18px;
+    border: 2px solid rgb(200, 165, 80);
+    border-top: 2px solid rgb(200, 165, 80);
+    border-bottom: none;
+    border-right: none;
+    border-left: none;
+    border-radius: 0;
+    box-shadow: var(--dota-shadow);
+    /* Трапециевидная правая сторона */
+    clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 100%, 0 100%);
+    transform: scale(var(--ui-scale));
+    transform-origin: bottom left;
 }

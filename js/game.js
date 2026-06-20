@@ -1607,7 +1607,16 @@ window.addEventListener('mousedown', (e) => {
 });
 
 function selectEntity(ent) {
-    state.selectedEntities = [ent]; ent.isManualMove = false; updateInspectPanel(ent); updateCharacterMenu();
+    // Если персонаж уже выбран - снимаем выбор
+    if (state.selectedEntities.length === 1 && state.selectedEntities[0] === ent) {
+        deselectEntity();
+        return;
+    }
+    // Иначе выбираем только его
+    state.selectedEntities = [ent]; 
+    ent.isManualMove = false; 
+    updateInspectPanel(ent); 
+    updateCharacterMenu();
 }
 
 function deselectEntity() {
@@ -1918,10 +1927,14 @@ window.addEventListener('mousemove', (e) => {
     customCursor.style.left = e.clientX + 'px';
     customCursor.style.top = e.clientY + 'px';
     
+    // Temporarily hide cursor to get correct elements from point
+    customCursor.style.visibility = 'hidden';
     const elements = document.elementsFromPoint(e.clientX, e.clientY);
+    customCursor.style.visibility = 'visible';
     const isOverCanvas = elements.some(el => el === canvas);
     const isOverUI = elements.some(el => 
-        el.id === 'top-bar' || 
+        el.id === 'hud-right' || 
+        el.id === 'time-container' || 
         el.id === 'bottom-menu' || 
         el.id === 'character-menu' || 
         el.id === 'inspect-panel' || 
@@ -1929,7 +1942,8 @@ window.addEventListener('mousemove', (e) => {
         el.id === 'architect-menu' ||
         el.id === 'debug-time-panel' ||
         el.id === 'action-panel' ||
-        el.closest('#top-bar') ||
+        el.closest('#hud-right') ||
+        el.closest('#time-container') ||
         el.closest('#bottom-menu') ||
         el.closest('#character-menu') ||
         el.closest('#inspect-panel') ||
@@ -1976,7 +1990,7 @@ window.addEventListener('mousemove', (e) => {
             }
         } else {
             // Default cursor
-            customCursor.style.backgroundImage = 'url(cursor.png)';
+            customCursor.style.backgroundImage = 'url(assets/cursor.png)';
             customCursor.classList.add('cursor-default');
             customCursor.style.display = 'block';
         }
@@ -2653,6 +2667,64 @@ function getJobTypeName(job) {
     }
 }
 
+// Initialize event delegation
+function initCancelButtons() {
+    console.log('Initializing cancel button listeners...');
+    const actionList = document.getElementById('action-list');
+    if (!actionList) {
+        console.log('ERROR: action-list not found!');
+        return;
+    }
+    
+    console.log('action-list found! Adding listeners...');
+    
+    // Global click listener
+    actionList.addEventListener('click', (e) => {
+        console.log('=== action-list CLICK ===');
+        console.log('Target:', e.target);
+        
+        const cancelBtn = e.target.closest('.cancel-task-btn');
+        if (cancelBtn) {
+            console.log('Cancel button found!');
+            e.stopPropagation();
+            e.preventDefault();
+            
+            const entityId = parseInt(cancelBtn.getAttribute('data-entity-id'));
+            const jobId = parseInt(cancelBtn.getAttribute('data-job-id'));
+            console.log('Calling cancelTask with:', entityId, jobId);
+            
+            cancelTask(entityId, jobId);
+        }
+    });
+    
+    actionList.addEventListener('mousedown', (e) => {
+        console.log('=== action-list MOUSEDOWN ===');
+        console.log('Target:', e.target);
+    });
+    
+    console.log('Cancel button listeners initialized!');
+}
+
+// Global debug listener for all clicks
+document.addEventListener('mousedown', (e) => {
+    console.log('=== GLOBAL MOUSEDOWN ===');
+    console.log('Target:', e.target);
+    console.log('Element:', e.target.closest('.cancel-task-btn'));
+    
+    // Temporarily hide cursor to get correct element from point
+    const customCursor = document.getElementById('custom-cursor');
+    if (customCursor) {
+        customCursor.style.visibility = 'hidden';
+        console.log('Element from point:', document.elementFromPoint(e.clientX, e.clientY));
+        customCursor.style.visibility = 'visible';
+    } else {
+        console.log('Element from point:', document.elementFromPoint(e.clientX, e.clientY));
+    }
+});
+
+// Initialize immediately
+setTimeout(initCancelButtons, 100);
+
 function updateActionPanel() {
     const actionList = document.getElementById('action-list');
     const cancelAllBtn = document.getElementById('cancel-all-btn');
@@ -2665,12 +2737,12 @@ function updateActionPanel() {
         // Add current job
         if (ent.job) {
             hasTasks = true;
-            html += `<div class="action-item" data-job-id="${ent.job.id}" data-entity-id="${ent.id}">
+            html += `<div class="action-item">
                 <div class="action-content">
                     <div class="action-character">${ent.name}</div>
                     <div class="action-status">${getJobTypeName(ent.job)} (${Math.floor(ent.job.progress)}%)</div>
                 </div>
-                <button class="cancel-task-btn" data-job-id="${ent.job.id}" data-entity-id="${ent.id}">✕</button>
+                <button class="cancel-task-btn" data-job-id="${ent.job.id}" data-entity-id="${ent.id}" title="Отменить">✕</button>
             </div>`;
         }
 
@@ -2678,12 +2750,12 @@ function updateActionPanel() {
         if (ent.taskQueue) {
             ent.taskQueue.forEach(job => {
                 hasTasks = true;
-                html += `<div class="action-item" data-job-id="${job.id}" data-entity-id="${ent.id}">
+                html += `<div class="action-item">
                     <div class="action-content">
                         <div class="action-character">${ent.name}</div>
                         <div class="action-status">${getJobTypeName(job)} (Ожидание...)</div>
                     </div>
-                    <button class="cancel-task-btn" data-job-id="${job.id}" data-entity-id="${ent.id}">✕</button>
+                    <button class="cancel-task-btn" data-job-id="${job.id}" data-entity-id="${ent.id}" title="Отменить">✕</button>
                 </div>`;
             });
         }
@@ -2691,88 +2763,66 @@ function updateActionPanel() {
 
     actionList.innerHTML = html;
     cancelAllBtn.disabled = !hasTasks;
-    
-    // Add event listeners
-    const cancelBtns = actionList.querySelectorAll('.cancel-task-btn');
-    cancelBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const entityId = parseInt(btn.dataset.entityId);
-            const jobId = parseInt(btn.dataset.jobId);
-            console.log('Cancel clicked:', entityId, jobId);
-            cancelTask(entityId, jobId);
-        });
-    });
 }
 
 window.cancelTask = function(entityId, jobId) {
-    console.log('cancelTask called with:', entityId, jobId);
+    console.log('=== cancelTask START ===');
+    console.log('Input:', entityId, jobId);
+    
     const ent = state.entities.find(e => e.id === entityId);
     if (!ent) {
-        console.log('Entity not found!');
+        console.log('ERROR: Entity not found!');
         return;
     }
+    console.log('Found entity:', ent.name);
 
-    // Check if it's the current job
+    // Cancel current job
     if (ent.job && ent.job.id === jobId) {
-        console.log('Canceling current job:', ent.job);
-        // Remove from state.jobs
-        state.jobs = state.jobs.filter(j => j.id !== jobId);
+        console.log('Canceling CURRENT job:', ent.job);
         
-        // Refund resources if needed
-        if (ent.job.type === 'build_wall') {
-            state.resources.stone += 12;
-            updateResourceUI();
-        } else if (ent.job.type === 'build_wood_wall') {
-            state.resources.wood += 8;
-            updateResourceUI();
-        } else if (ent.job.type === 'build_bridge') {
-            state.resources.wood += 10;
-            updateResourceUI();
-        }
-
-        // Clear job, status, target and manual move
+        // Refund if needed
+        if (ent.job.type === 'build_wall') state.resources.stone += 12;
+        if (ent.job.type === 'build_wood_wall') state.resources.wood += 8;
+        if (ent.job.type === 'build_bridge') state.resources.wood += 10;
+        
+        // Clear everything
         ent.job.assigned = false;
         ent.job = null;
         ent.status = null;
         ent.target = null;
         ent.path = [];
         ent.isManualMove = false;
-
-        // Assign next task from queue
+        
+        updateResourceUI();
+        
+        // Next job
         if (ent.taskQueue && ent.taskQueue.length > 0) {
             const nextJob = ent.taskQueue.shift();
-            console.log('Assigning next job from queue:', nextJob);
+            console.log('Next job from queue:', nextJob);
             assignJobToEntity(ent, nextJob);
         }
-    } else if (ent.taskQueue) {
-        // Remove from task queue
+    }
+    // Cancel queued job
+    else if (ent.taskQueue) {
         const queueIndex = ent.taskQueue.findIndex(j => j.id === jobId);
         if (queueIndex !== -1) {
-            console.log('Canceling queued job at index:', queueIndex);
+            console.log('Canceling QUEUED job at index:', queueIndex);
             const removedJob = ent.taskQueue.splice(queueIndex, 1)[0];
-            // Remove from state.jobs
-            state.jobs = state.jobs.filter(j => j.id !== jobId);
-
-            // Refund resources
-            if (removedJob.type === 'build_wall') {
-                state.resources.stone += 12;
-                updateResourceUI();
-            } else if (removedJob.type === 'build_wood_wall') {
-                state.resources.wood += 8;
-                updateResourceUI();
-            } else if (removedJob.type === 'build_bridge') {
-                state.resources.wood += 10;
-                updateResourceUI();
-            }
-
-            // Also unassign if it was assigned
             removedJob.assigned = false;
+            
+            if (removedJob.type === 'build_wall') state.resources.stone += 12;
+            if (removedJob.type === 'build_wood_wall') state.resources.wood += 8;
+            if (removedJob.type === 'build_bridge') state.resources.wood += 10;
+            
+            updateResourceUI();
         }
     }
-
-    console.log('Updating action panel...');
+    
+    state.jobs = state.jobs.filter(j => j.id !== jobId);
+    console.log('Removed job from state.jobs');
+    
     updateActionPanel();
+    console.log('=== cancelTask END ===');
 };
 
 window.cancelAllTasks = function() {

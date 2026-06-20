@@ -14,10 +14,48 @@
         <div id="custom-cursor"></div>
         <canvas id="gameCanvas"></canvas>
         <div id="ui-overlay">
+            <!-- Regen Button (Top Left) -->
             <button id="regen-btn" onclick="regenerateWorld()">
                 <span id="regen-progress"></span>
                 <span id="regen-text">Regen World</span>
             </button>
+            
+            <!-- Time (Center Top) -->
+            <div id="time-container">
+                <div class="time-icons-wrapper">
+                    <span id="time-icon-sun" class="time-icon active">☀️</span>
+                    <span id="time-icon-moon" class="time-icon">🌙</span>
+                </div>
+                <div id="time">Day 1, 08:00</div>
+            </div>
+            
+            <!-- All Resources (Top Right) -->
+            <div id="hud-right">
+                <div id="resources">
+                    <div class="res-item silver">
+                        <span class="res-icon">🪙</span>
+                        <div id="silver-count" class="counter-container"></div>
+                    </div>
+                    <div class="res-item stone">
+                        <span class="res-icon">🪨</span>
+                        <div id="stone-count" class="counter-container"></div>
+                    </div>
+                    <div class="res-item wood">
+                        <span class="res-icon">🪵</span>
+                        <div id="wood-count" class="counter-container"></div>
+                    </div>
+                    <div class="res-item gold">
+                        <span class="res-icon">✨</span>
+                        <div id="gold-count" class="counter-container"></div>
+                    </div>
+                    <div class="res-item food">
+                        <span class="res-icon">🍞</span>
+                        <div id="food-count" class="counter-container"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Panel (Bottom Left) -->
             <div id="action-panel">
                 <div class="action-panel-header">
                     <span class="panel-title">Очередь задач</span>
@@ -25,56 +63,18 @@
                 <div id="action-list" class="action-list"></div>
                 <button id="cancel-all-btn" class="cancel-all-btn" onclick="cancelAllTasks()">Завершение всей работы</button>
             </div>
-            <div id="top-bar">
-                <div class="hud-left">
-                    <div id="resources">
-                        <div class="res-item silver">
-                            <span class="res-icon">🪙</span>
-                            <div id="silver-count" class="counter-container"></div>
-                        </div>
-                        <div class="res-item stone">
-                            <span class="res-icon">🪨</span>
-                            <div id="stone-count" class="counter-container"></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="hud-center">
-                    <div id="time-container">
-                        <div class="time-icons-wrapper">
-                            <span id="time-icon-sun" class="time-icon active">☀️</span>
-                            <span id="time-icon-moon" class="time-icon">🌙</span>
-                        </div>
-                        <div id="time">Day 1, 08:00</div>
-                    </div>
-                </div>
-
-                <div class="hud-right">
-                    <div id="resources-right">
-                        <div class="res-item wood">
-                            <span class="res-icon">🪵</span>
-                            <div id="wood-count" class="counter-container"></div>
-                        </div>
-                        <div class="res-item gold">
-                            <span class="res-icon">✨</span>
-                            <div id="gold-count" class="counter-container"></div>
-                        </div>
-                        <div class="res-item food">
-                            <span class="res-icon">🍞</span>
-                            <div id="food-count" class="counter-container"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            
+            <!-- Bottom Menu (Center Bottom) -->
             <div id="bottom-menu">
                 <button onclick="setOrder('architect')">Architect</button>
                 <button onclick="setOrder('unarchitect')">Destruct</button>
                 <button onclick="setOrder('chop')">Chop</button>
                 <button onclick="setOrder('mine')">Mine</button>
             </div>
+            
+            <!-- Character Menu (Bottom Right - no deselect) -->
             <div id="character-menu">
                 <div id="character-list"></div>
-                <button id="deselect-btn" onclick="deselectEntity()">Deselect</button>
             </div>
             <div id="architect-menu" class="hidden">
                 <h3>Build Menu</h3>
