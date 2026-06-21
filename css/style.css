@@ -1,3 +1,4 @@
+/* CSS переменные */
 :root {
     --dota-bg: #121415;
     --dota-panel: linear-gradient(135deg, rgba(18, 20, 21, 0.98) 0%, rgba(10, 12, 13, 0.95) 100%);
@@ -13,10 +14,12 @@
     --ui-scale: 0.75; /* Масштаб интерфейса (0.75 = полтора раза больше, чем 0.5) */
 }
 
+/* Сброс стилей */
 * {
     box-sizing: border-box;
 }
 
+/* Тело и HTML */
 body, html {
     margin: 0;
     padding: 0;
@@ -32,21 +35,24 @@ body, html {
     cursor: none !important;
 }
 
-/* Ensure all elements also hide default cursor */
+/* Убедиться, что все элементы скрывают стандартный курсор */
 * {
     cursor: none !important;
 }
 
+/* Контейнер игры */
 #game-container {
     position: relative;
     width: 100vw;
     height: 100vh;
 }
 
+/* Canvas игры */
 #gameCanvas {
     display: block;
 }
 
+/* Кастомный курсор */
 #custom-cursor {
     position: fixed;
     pointer-events: none !important;
@@ -63,7 +69,7 @@ body, html {
     touch-action: none;
 }
 
-/* Default cursor */
+/* Стандартный курсор */
 #custom-cursor.cursor-default {
     width: 26px;
     height: 26px;
@@ -71,7 +77,7 @@ body, html {
     transform: translate(0px, 1px) translateZ(0);
 }
 
-/* Select cursor (UI/buttons) */
+/* Курсор выбора (UI/кнопки) */
 #custom-cursor.cursor-select {
     width: 26px;
     height: 26px;
@@ -79,7 +85,7 @@ body, html {
     transform: translate(-11px, 1px) translateZ(0);
 }
 
-/* Chop cursor (trees) */
+/* Курсор рубки (деревья) */
 #custom-cursor.cursor-chop {
     width: 42px;
     height: 42px;
@@ -87,7 +93,7 @@ body, html {
     transform: translate(-9px, -6px) translateZ(0);
 }
 
-/* Mine cursor (stones/ores) */
+/* Курсор добычи (камни/руда) */
 #custom-cursor.cursor-mine {
     width: 42px;
     height: 42px;
@@ -95,6 +101,7 @@ body, html {
     transform: translate(-4px, -8px) translateZ(0);
 }
 
+/* UI-оверлей */
 #ui-overlay {
     position: fixed;
     top: 0;
@@ -114,7 +121,7 @@ body, html {
     pointer-events: none;
 }
 
-/* Regen Button (Top Left with small gap) */
+/* Кнопка регенерации */
 #regen-btn {
     position: absolute;
     top: 20px;
@@ -156,7 +163,7 @@ body, html {
     box-shadow: 0 0 15px rgba(167, 41, 41, 0.3);
 }
 
-/* Time Container (Center Top) */
+/* Контейнер времени */
 #time-container {
     position: absolute;
     top: 0;
@@ -226,7 +233,7 @@ body, html {
     clip-path: polygon(0 0, 100% 0, 90% 100%, 10% 100%);
 }
 
-/* All Resources HUD (Top Right, tight to corner) */
+/* HUD ресурсов */
 #hud-right {
     position: absolute;
     top: 0;
@@ -236,7 +243,7 @@ body, html {
     border-top: none;
     border-left: none;
     border-right: none;
-    padding: 8px 25px 8px 40px; /* Увеличим отступ слева для трапеции */
+    padding: 8px 25px 8px 40px;
     display: flex;
     align-items: center;
     box-shadow: var(--dota-shadow);
@@ -247,6 +254,7 @@ body, html {
     transform-origin: top right;
 }
 
+/* Ресурсы */
 #resources {
     display: flex;
     align-items: center;
@@ -276,7 +284,7 @@ body, html {
     filter: drop-shadow(0 0 5px rgba(0,0,0,0.8));
 }
 
-/* Counter styles like slot machines */
+/* Стили счетчиков */
 .counter-container {
     display: flex;
     align-items: center;
@@ -296,14 +304,14 @@ body, html {
     transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Colors for resources */
+/* Цвета ресурсов */
 #silver-count .counter-digit { color: #e5c16f !important; }
 #stone-count .counter-digit { color: #aaa !important; }
 #wood-count .counter-digit { color: #a67c52 !important; }
 #gold-count .counter-digit { color: #FFD700 !important; }
 #food-count .counter-digit { color: #81c784 !important; }
 
-/* Buttons */
+/* Кнопки */
 button {
     background: linear-gradient(180deg, #2d2d2d 0%, #1a1a1a 100%);
     color: #cccccc;
@@ -509,26 +517,8 @@ button:hover::after {
     color: #fff;
     font-size: 14px;
 }
-
-/* Character Menu (Bottom Right, tight to corner) */
 #character-menu {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    background: var(--dota-panel);
-    padding: 22px 24px;
-    border: 2px solid rgb(200, 165, 80);
-    border-top: 2px solid rgb(200, 165, 80);
-    border-bottom: none;
-    border-right: none;
-    border-radius: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    min-width: 200px;
-    box-shadow: var(--dota-shadow);
-    transform: scale(var(--ui-scale));
-    transform-origin: bottom right;
+    display: none;
 }
 
 #character-list {
@@ -587,26 +577,23 @@ button:hover::after {
 
 /* Architect Menu */
 #architect-menu {
-    position: absolute;
-    bottom: 145px;
-    left: 50%;
-    transform: translateX(-50%) scale(var(--ui-scale));
-    transform-origin: bottom center;
+    position: fixed;
+    z-index: 1000;
     background: var(--dota-panel);
     border: 2px solid var(--dota-border);
     border-top: 2px solid #4a4a4a;
-    padding: 22px 26px;
+    padding: 12px 16px;
     border-radius: 4px;
     box-shadow: var(--dota-shadow);
-    min-width: 340px;
+    min-width: 260px;
 }
 
 #architect-menu h3 {
     font-family: var(--dota-font-title);
-    margin: 0 0 16px 0;
-    padding-bottom: 12px;
+    margin: 0 0 10px 0;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--dota-border);
-    font-size: 18px;
+    font-size: 15px;
     color: var(--dota-gold);
     letter-spacing: 0.5px;
 }
@@ -614,28 +601,28 @@ button:hover::after {
 .build-options {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
 .build-options button {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 18px;
+    padding: 8px 12px;
     text-align: left;
     width: 100%;
 }
 
 .build-icon {
-    font-size: 21px;
-    margin-right: 16px;
+    font-size: 18px;
+    margin-right: 12px;
 }
 
 .build-cost {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--dota-gold-bright);
     background: rgba(0, 0, 0, 0.4);
-    padding: 4px 10px;
+    padding: 3px 8px;
     border: 1px solid rgba(197, 164, 85, 0.2);
     border-radius: 2px;
     letter-spacing: 0.3px;
@@ -862,20 +849,22 @@ button:hover::after {
 /* HP Container */
 #hp-container {
     position: absolute;
-    top: 90px;
-    left: 20px;
+    top: 45px;
+    right: 0;
     z-index: 100;
-    background: var(--dota-panel);
-    border: 2px solid var(--dota-border);
+    background: linear-gradient(180deg, rgba(20, 22, 24, 0.98) 0%, rgba(10, 12, 13, 0.95) 100%);
+    border: 2px solid rgb(200, 165, 80);
     border-top: 2px solid #4a4a4a;
-    border-radius: 4px;
-    padding: 12px 18px;
+    border-radius: 0;
+    padding: 8px 18px;
     display: flex;
     align-items: center;
     gap: 12px;
     box-shadow: var(--dota-shadow);
+    /* Обратный трапециевидный левый край, как у ресурсов */
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 30px 100%);
     transform: scale(var(--ui-scale));
-    transform-origin: top left;
+    transform-origin: top right;
 }
 
 .hp-icon {
@@ -884,8 +873,8 @@ button:hover::after {
 }
 
 .hp-bar-wrapper {
-    width: 200px;
-    height: 22px;
+    width: 140px;
+    height: 18px;
     background: rgba(0,0,0,0.6);
     border: 1px solid #2a2a2a;
     border-radius: 3px;
@@ -939,6 +928,23 @@ button:hover::after {
     background-position: center;
     transform: translate(-5px, -5px) translateZ(0);
     filter: drop-shadow(0 0 10px rgba(255,100,0,0.8));
+}
+
+/* Hotkey Tooltip */
+#hotkey-tooltip {
+    position: absolute;
+    bottom: 15px;
+    right: 25px;
+    background: var(--dota-panel);
+    border: 2px solid rgb(200, 165, 80);
+    border-radius: 4px;
+    padding: 10px 16px;
+    font-family: var(--dota-font-main);
+    color: var(--dota-text);
+    font-size: 15px;
+    box-shadow: var(--dota-shadow);
+    transform: scale(var(--ui-scale));
+    transform-origin: bottom right;
 }
 
 /* Death Screen */

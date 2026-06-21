@@ -12,7 +12,16 @@ const state = {
         lastMouseX: 0,
         lastMouseY: 0,
         dragStartX: 0,
-        dragStartY: 0
+        dragStartY: 0,
+        transition: {
+            active: false,
+            startTime: 0,
+            duration: 0,
+            startX: 0,
+            startY: 0,
+            targetX: 0,
+            targetY: 0
+        }
     },
     map: {
         width: 512,
@@ -1893,6 +1902,7 @@ window.addEventListener('mousedown', (e) => {
     if (e.target.closest('#top-bar') || e.target.closest('#bottom-menu') || e.target.closest('#inspect-panel') || e.target.closest('#character-menu') || e.target.closest('#regen-btn') || e.target.closest('#architect-menu') || e.target.closest('#inspect-widget')) return;
     if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
         state.camera.isDragging = true;
+        state.camera.transition.active = false; // остановить переход при перетаскивании
         state.camera.lastMouseX = e.clientX; state.camera.lastMouseY = e.clientY;
         state.camera.dragStartX = e.clientX; state.camera.dragStartY = e.clientY;
         return;
@@ -2032,19 +2042,12 @@ window.addEventListener('mousedown', (e) => {
         }
         
         // Если не было задачи, делаем обычное движение
-        if (state.selectedEntities.length > 0) {
-            if (isWalkable(tx, ty)) {
-                const assignedTiles = new Set();
-                state.selectedEntities.forEach(ent => {
-                    if (ent.job) {
-                        ent.job.assigned = false;
-                        ent.job = null;
-                    }
-                    if (ent.taskQueue) {
-                        ent.taskQueue.forEach(job => job.assigned = false);
-                        ent.taskQueue = [];
-                    }
-
+    if (state.selectedEntities.length > 0) {
+        // Проверить, есть ли у выбранных персонажей задачи
+        const anyEntityHasWork = state.selectedEntities.some(ent => ent.job || (ent.taskQueue && ent.taskQueue.length > 0));
+        if (!anyEntityHasWork && isWalkable(tx, ty)) {
+            const assignedTiles = new Set();
+            state.selectedEntities.forEach(ent => {
                     let targetX = tx;
                     let targetY = ty;
                     
@@ -2146,7 +2149,7 @@ function updateInspectPanel(ent) {
     const title = document.getElementById('inspect-title');
     const content = document.getElementById('inspect-content');
     
-    // Show panel and hide widget
+
     panel.classList.remove('hidden');
     widget.classList.add('hidden');
     
@@ -2177,14 +2180,14 @@ window.toggleInspectPanel = function() {
     const widget = document.getElementById('inspect-widget');
     
     if (isInspectMinimized) {
-        // Expand
+
         panel.style.left = widgetPosition.left + 'px';
         panel.style.bottom = widgetPosition.bottom + 'px';
         panel.classList.remove('hidden');
         widget.classList.add('hidden');
         isInspectMinimized = false;
     } else {
-        // Minimize
+
         const panelRect = panel.getBoundingClientRect();
         widgetPosition.left = parseInt(panel.style.left) || 35;
         widgetPosition.bottom = parseInt(panel.style.bottom) || 140;
@@ -2192,7 +2195,7 @@ window.toggleInspectPanel = function() {
         widget.style.left = widgetPosition.left + 'px';
         widget.style.bottom = widgetPosition.bottom + 'px';
         
-        // Update widget avatar
+
         if (state.selectedEntities.length > 0) {
             const ent = state.selectedEntities[0];
             const widgetAvatar = document.getElementById('widget-avatar');
@@ -2205,7 +2208,7 @@ window.toggleInspectPanel = function() {
     }
 };
 
-// Setup widget dragging
+
 function setupWidgetDragging() {
     const widget = document.getElementById('inspect-widget');
     
@@ -2219,7 +2222,7 @@ function setupWidgetDragging() {
         e.stopPropagation();
     });
     
-    // Click on widget to expand
+
     widget.addEventListener('click', (e) => {
         if (!isDraggingWidget) {
             toggleInspectPanel();
@@ -2227,13 +2230,13 @@ function setupWidgetDragging() {
     });
 }
 
-// Setup panel dragging
+
 function setupPanelDragging() {
     const panel = document.getElementById('inspect-panel');
     
     panel.addEventListener('mousedown', (e) => {
         if (e.target.closest('.minimize-btn')) return;
-        if (e.target.tagName === 'BUTTON') return; // Don't drag when clicking on buttons
+        if (e.target.tagName === 'BUTTON') return; 
         isDraggingPanel = true;
         const rect = panel.getBoundingClientRect();
         dragOffset.x = e.clientX - rect.left;
@@ -2243,7 +2246,7 @@ function setupPanelDragging() {
     });
 }
 
-// Global mousemove for both widget and panel
+
 window.addEventListener('mousemove', (e) => {
     if (isDraggingWidget) {
         const widget = document.getElementById('inspect-widget');
@@ -2251,11 +2254,11 @@ window.addEventListener('mousemove', (e) => {
         const widgetWidth = widgetRect.width || 60;
         const widgetHeight = widgetRect.height || 60;
         
-        // Calculate new position
+
         let newLeft = e.clientX - dragOffset.x;
         let newBottom = window.innerHeight - e.clientY + dragOffset.y;
         
-        // Constrain to screen bounds
+
         newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - widgetWidth));
         newBottom = Math.max(0, Math.min(newBottom, window.innerHeight - widgetHeight));
         
@@ -2272,11 +2275,11 @@ window.addEventListener('mousemove', (e) => {
         const panelWidth = panelRect.width || 340;
         const panelHeight = panelRect.height || 200;
         
-        // Calculate new position
+
         let newLeft = e.clientX - dragOffset.x;
         let newBottom = window.innerHeight - e.clientY + dragOffset.y;
         
-        // Constrain to screen bounds
+
         newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - panelWidth));
         newBottom = Math.max(0, Math.min(newBottom, window.innerHeight - panelHeight));
         
@@ -2287,13 +2290,12 @@ window.addEventListener('mousemove', (e) => {
     }
 });
 
-// Global mouseup
 window.addEventListener('mouseup', () => {
     isDraggingWidget = false;
     isDraggingPanel = false;
 });
 
-// Call setups after DOM loads
+
 setupWidgetDragging();
 setupPanelDragging();
 
@@ -2322,7 +2324,6 @@ function screenToWorld(screenX, screenY) {
     return { x, y };
 }
 
-// Variable to track if any selected entity is near cave entrance/exit
 let nearbyCaveTile = null;
 
 function updateHPUI() {
@@ -2470,6 +2471,27 @@ function handleCaveInteraction() {
 }
 
 // клавиатурные сокращения
+// плавная камера на персонажа
+function startCameraTransition(targetX, targetY, duration) {
+    console.log('startCameraTransition called!', {
+        targetX: targetX,
+        targetY: targetY,
+        currentCamX: state.camera.x,
+        currentCamY: state.camera.y,
+        targetCamX: -targetX * state.map.tileSize,
+        targetCamY: -targetY * state.map.tileSize
+    });
+    state.camera.transition = {
+        active: true,
+        startTime: Date.now(),
+        duration: duration,
+        startX: state.camera.x,
+        startY: state.camera.y,
+        targetX: -targetX * state.map.tileSize,
+        targetY: -targetY * state.map.tileSize
+    };
+}
+
 window.addEventListener('keydown', (e) => {
     state.keys[e.code] = true;
     if (!state.keyPressTime[e.code]) state.keyPressTime[e.code] = Date.now();
@@ -2487,6 +2509,17 @@ window.addEventListener('keydown', (e) => {
             handleCaveInteraction(); // F - взаимодействие с пещерой (если рядом)
         } else {
             toggleAttackMode(); // F - режим атаки
+        }
+    }
+    else if (e.code === 'KeyG') { // G - камера на персонажа
+        let targetEnt = null;
+        if (state.selectedEntities.length > 0) {
+            targetEnt = state.selectedEntities[0];
+        } else if (state.entities.length > 0) {
+            targetEnt = state.entities[0];
+        }
+        if (targetEnt) {
+            startCameraTransition(targetEnt.x, targetEnt.y, 1000); // 1 секунда
         }
     }
 });
@@ -2534,7 +2567,11 @@ function toggleFogOfWar() {
     state.map.fogOfWarEnabled = !state.map.fogOfWarEnabled;
 }
 
+let currentMouseX = 0;
+let currentMouseY = 0;
 window.addEventListener('mousemove', (e) => {
+    currentMouseX = e.clientX;
+    currentMouseY = e.clientY;
     if (state.camera.isDragging) {
         state.camera.x += (e.clientX - state.camera.lastMouseX) / state.camera.zoom;
         state.camera.y += (e.clientY - state.camera.lastMouseY) / state.camera.zoom;
@@ -2585,6 +2622,10 @@ window.addEventListener('mousemove', (e) => {
     // Reset all cursor classes
     customCursor.classList.remove('cursor-default', 'cursor-select', 'cursor-chop', 'cursor-mine', 'cursor-attack');
     
+    const hotkeyTooltip = document.getElementById('hotkey-tooltip');
+    let showTooltip = false;
+    let tooltipText = '';
+    
     // логика курсора
     if (state.combat.attackMode && !isOverUI) {
         // Курсор атаки (меч)
@@ -2592,6 +2633,8 @@ window.addEventListener('mousemove', (e) => {
         customCursor.style.backgroundImage = ''; // Удаляем инлайновый фон, чтобы сработал CSS
         customCursor.classList.add('cursor-attack');
         customCursor.style.display = 'block';
+        tooltipText = 'ПКМ - Атаковать';
+        showTooltip = true;
     } else if (isOverUI) {
         // Select cursor for UI/buttons
         customCursor.textContent = '';
@@ -2611,6 +2654,8 @@ window.addEventListener('mousemove', (e) => {
                 customCursor.style.backgroundImage = 'url(assets/chop.png)';
                 customCursor.classList.add('cursor-chop');
                 customCursor.style.display = 'block';
+                tooltipText = 'ПКМ - Срубить';
+                showTooltip = true;
             } else if (tile.type === TILE_TYPES.STONE || tile.type === TILE_TYPES.GOLD_ORE || 
                        tile.type === TILE_TYPES.MOUNTAIN_ROCK || tile.type === TILE_TYPES.MOUNTAIN_ROCK_DARK || 
                        tile.type === TILE_TYPES.MOUNTAIN_SNOW) {
@@ -2618,11 +2663,19 @@ window.addEventListener('mousemove', (e) => {
                 customCursor.style.backgroundImage = 'url(assets/mine.png)';
                 customCursor.classList.add('cursor-mine');
                 customCursor.style.display = 'block';
+                if (tile.type === TILE_TYPES.GOLD_ORE) {
+                    tooltipText = 'ПКМ - Добыть золото';
+                } else if (tile.type === TILE_TYPES.MOUNTAIN_ROCK || tile.type === TILE_TYPES.MOUNTAIN_SNOW || tile.type === TILE_TYPES.MOUNTAIN_ROCK_DARK) {
+                    tooltipText = 'ПКМ - Добыть камень';
+                }
+                showTooltip = true;
             } else {
                 // Default cursor
                 customCursor.style.backgroundImage = 'url(assets/cursor.png)';
                 customCursor.classList.add('cursor-default');
                 customCursor.style.display = 'block';
+                tooltipText = 'ПКМ - Идти';
+                showTooltip = true;
             }
         } else {
             // Default cursor
@@ -2631,8 +2684,16 @@ window.addEventListener('mousemove', (e) => {
             customCursor.style.display = 'block';
         }
     } else {
-        // Hide custom cursor when outside window
+        // Скрыть кастомный курсор за пределами окна
         customCursor.style.display = 'none';
+    }
+    
+    // Показ/скрытие подсказки
+    if (showTooltip && tooltipText) {
+        hotkeyTooltip.textContent = tooltipText;
+        hotkeyTooltip.classList.remove('hidden');
+    } else {
+        hotkeyTooltip.classList.add('hidden');
     }
     
     state.camera.lastMouseX = e.clientX; state.camera.lastMouseY = e.clientY;
@@ -3102,6 +3163,22 @@ function updateTimeUI() {
 }
 
 function render() {
+    // плавный переход камеры
+    if (state.camera.transition.active) {
+        const now = Date.now();
+        const elapsed = now - state.camera.transition.startTime;
+        const t = Math.min(elapsed / state.camera.transition.duration, 1);
+        // Ease In Out интерполяция
+        const easeT = t < 0.5 
+            ? 2 * t * t 
+            : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        state.camera.x = state.camera.transition.startX + (state.camera.transition.targetX - state.camera.transition.startX) * easeT;
+        state.camera.y = state.camera.transition.startY + (state.camera.transition.targetY - state.camera.transition.startY) * easeT;
+        if (t >= 1) {
+            state.camera.transition.active = false;
+        }
+    }
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -3401,8 +3478,7 @@ window.restartGame = function() {
     // Regenerate the world
     regenerateWorld();
 };
-window.setOrder = function(type) {
-    state.lastPaintedTile = null; // Reset when order changes
+window.setOrder = function(type) {    state.lastPaintedTile = null; // Reset when order changes
 
     if (type === 'architect') {
         // Toggle architect menu
@@ -3413,6 +3489,9 @@ window.setOrder = function(type) {
         } else {
             state.currentOrder = 'architect';
             menu.classList.remove('hidden');
+            // Position the menu near the cursor
+            menu.style.left = currentMouseX + 'px';
+            menu.style.top = currentMouseY + 'px';
         }
     } else {
         // Hide architect menu for other orders

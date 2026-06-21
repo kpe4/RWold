@@ -55,6 +55,15 @@
                 </div>
             </div>
             
+            <!-- Player HP Bar (Below Resources) -->
+            <div id="hp-container">
+                <span class="hp-icon">❤️</span>
+                <div class="hp-bar-wrapper">
+                    <div id="hp-bar"></div>
+                </div>
+                <span id="hp-text">100 / 100</span>
+            </div>
+            
             <!-- Action Panel (Bottom Left) -->
             <div id="action-panel">
                 <div class="action-panel-header">
@@ -62,15 +71,6 @@
                 </div>
                 <div id="action-list" class="action-list"></div>
                 <button id="cancel-all-btn" class="cancel-all-btn" onclick="cancelAllTasks()">Завершение всей работы</button>
-            </div>
-            
-            <!-- Player HP Bar (Top Left Below Regen) -->
-            <div id="hp-container">
-                <span class="hp-icon">❤️</span>
-                <div class="hp-bar-wrapper">
-                    <div id="hp-bar"></div>
-                </div>
-                <span id="hp-text">100 / 100</span>
             </div>
             
             <!-- Bottom Menu (Center Bottom) -->
@@ -82,10 +82,7 @@
                 <button id="attack-btn" onclick="toggleAttackMode()">Attack</button>
             </div>
             
-            <!-- Character Menu (Bottom Right - no deselect) -->
-            <div id="character-menu">
-                <div id="character-list"></div>
-            </div>
+
             <div id="architect-menu" class="hidden">
                 <h3>Build Menu</h3>
                 <div class="build-options">
@@ -125,6 +122,8 @@
             </div>
             <!-- Cave Prompt -->
             <div id="cave-prompt" class="hidden"></div>
+            <!-- Hotkey Tooltip -->
+            <div id="hotkey-tooltip" class="hidden"></div>
             
             <!-- Death Screen -->
     <div id="death-screen" class="hidden">
