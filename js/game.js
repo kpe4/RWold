@@ -44,7 +44,7 @@ const state = {
         stone: 0,
         wood: 0,
         food: 10,
-        gold: 0 // Добавляем золото
+        gold: 0 
     },
     prevResources: {
         silver: 0,
