@@ -5,6 +5,21 @@ const ctx = canvas.getContext('2d');
 // состояние игры
 const state = {
     pickaxeDurability: 0, // сколько ударов у кирки
+    swordDurability: 0, // сколько ударов у меча
+    gameStartTime: Date.now(), // When the game started
+    raid: {
+        active: false,
+        startTime: 0,
+        duration: 0,
+        lastSpawnTime: 0
+    },
+    nextRaidTime: 0,
+    swordSwing: {
+        active: false,
+        startTime: 0,
+        targetX: 0,
+        targetY: 0
+    },
     camera: {
         x: -1616,
         y: -1616,
@@ -43,14 +58,14 @@ const state = {
         silver: 0,
         stone: 0,
         wood: 0,
-        food: 10,
+        food: 0,
         gold: 0 // Добавляем золото
     },
     prevResources: {
         silver: 0,
         stone: 0,
         wood: 0,
-        food: 10,
+        food: 0,
         gold: 0
     },
     entities: [],
@@ -257,6 +272,7 @@ function animateDigitElement(el, from, to) {
 }
 
 let prevPickaxeDurability = 0;
+let prevSwordDurability = 0;
 function updateResourceUI() {
     updateCounter('silver-count', state.resources.silver, state.prevResources.silver);
     updateCounter('stone-count', state.resources.stone, state.prevResources.stone);
@@ -264,6 +280,7 @@ function updateResourceUI() {
     updateCounter('food-count', state.resources.food, state.prevResources.food);
     updateCounter('gold-count', state.resources.gold, state.prevResources.gold);
     updateCounter('pickaxe-count', state.pickaxeDurability, prevPickaxeDurability);
+    updateCounter('sword-count', state.swordDurability, prevSwordDurability);
     
     // Обновляем предыдущие значения
     state.prevResources.silver = state.resources.silver;
@@ -272,6 +289,7 @@ function updateResourceUI() {
     state.prevResources.food = state.resources.food;
     state.prevResources.gold = state.resources.gold;
     prevPickaxeDurability = state.pickaxeDurability;
+    prevSwordDurability = state.swordDurability;
 }
 
 // Показать уведомление
@@ -297,6 +315,78 @@ window.craftPickaxe = function() {
     } else {
         showNotification('Недостаточно дерева! Нужно 48');
     }
+}
+
+// Крафт меча
+window.craftSword = function() {
+    if (state.resources.wood >= 14 && state.resources.stone >= 44) {
+        state.resources.wood -= 14;
+        state.resources.stone -= 44;
+        state.swordDurability += 100;
+        updateResourceUI();
+        showNotification('Меч создан! Прочность: 100');
+    } else {
+        showNotification('Недостаточно ресурсов! Нужно 14 дерева и 44 камня');
+    }
+};
+
+// Start a raid
+window.startRaid = function() {
+    if (state.raid.active) {
+        showNotification('Набег уже идет!');
+        return;
+    }
+    const now = Date.now();
+    state.raid.active = true;
+    state.raid.startTime = now;
+    // Raid duration: 4-6 minutes (240000-360000 ms)
+    state.raid.duration = 240000 + Math.random() * 120000;
+    state.raid.lastSpawnTime = now;
+    showNotification('НАБЕГ НАЧАЛСЯ!');
+};
+
+// Spawn a single raid enemy off-screen
+function spawnRaidEnemy() {
+    if (!state.entities.length) return; // No entities, can't spawn
+    
+    // Get average position of all player entities
+    let avgX = 0, avgY = 0;
+    state.entities.forEach(ent => {
+        avgX += ent.x;
+        avgY += ent.y;
+    });
+    avgX /= state.entities.length;
+    avgY /= state.entities.length;
+    
+    // Get screen size in tiles
+    const screenWidthTiles = canvas.width / (state.map.tileSize * state.camera.zoom);
+    const screenHeightTiles = canvas.height / (state.map.tileSize * state.camera.zoom);
+    
+    // Spawn off-screen (10 tiles away)
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.max(screenWidthTiles, screenHeightTiles) / 2 + 10;
+    const spawnX = avgX + Math.cos(angle) * distance;
+    const spawnY = avgY + Math.sin(angle) * distance;
+    
+    // Random HP: weak (2 hits, 30 HP) to strong (10 hits, 150 HP)
+    // Player attack is 15, so HP = 30-150
+    const hp = 30 + Math.random() * 120;
+    
+    // Add enemy
+    state.enemies.push({
+        x: Math.max(1, Math.min(state.map.width - 1, spawnX)),
+        y: Math.max(1, Math.min(state.map.height - 1, spawnY)),
+        hp: hp,
+        maxHp: hp,
+        attack: 8 + Math.random() * 12, // 8-20 attack
+        detectionRadius: 30, // Large detection radius
+        target: null,
+        lastAttackTime: 0,
+        lastWallHitTime: 0,
+        wallDamage: 0,
+        isAttacking: false,
+        wandering: false
+    });
 }
 
 function updateCharacterMenu() {
@@ -2287,13 +2377,52 @@ window.addEventListener('mousedown', (e) => {
                 });
                 
                 if (clickedEnemy) {
+                    // Get player position
+                    let playerX = 0, playerY = 0;
+                    if (state.entities.length > 0) {
+                        playerX = state.entities[0].x;
+                        playerY = state.entities[0].y;
+                    }
+                    // Check attack range (4 tiles)
+                    const distToEnemy = Math.sqrt(
+                        Math.pow(clickedEnemy.x - playerX, 2) +
+                        Math.pow(clickedEnemy.y - playerY, 2)
+                    );
+                    if (distToEnemy > 4) {
+                        showNotification('Враг слишком далеко! Подойдите ближе!');
+                        return;
+                    }
+                    // Check sword durability
+                    if (state.swordDurability <= 0) {
+                        showNotification('Меч сломался! Создай новый в Architect меню');
+                        state.combat.attackMode = false;
+                        const attackBtn = document.getElementById('attack-btn');
+                        attackBtn.classList.remove('active');
+                        return;
+                    }
+                    // Start sword swing animation
+                    state.swordSwing.active = true;
+                    state.swordSwing.startTime = now;
+                    state.swordSwing.targetX = clickedEnemy.x;
+                    state.swordSwing.targetY = clickedEnemy.y;
+                    
                     // Attack the enemy!
                     clickedEnemy.hp -= state.player.attack;
+                    state.swordDurability -= 1;
+                    updateResourceUI();
                     state.combat.lastAttackTime = now;
                     
                     // Check if enemy died!
                     if (clickedEnemy.hp <= 0) {
                         state.enemies = state.enemies.filter(e => e !== clickedEnemy);
+                    }
+                    
+                    // Check if sword broke
+                    if (state.swordDurability <= 0) {
+                        showNotification('Меч сломался! Создай новый в Architect меню');
+                        state.combat.attackMode = false;
+                        const attackBtn = document.getElementById('attack-btn');
+                        attackBtn.classList.remove('active');
                     }
                 }
             }
@@ -2713,10 +2842,15 @@ function updateHPUI() {
     const hpText = document.getElementById('hp-text');
     const hpPercent = (state.player.hp / state.player.maxHp) * 100;
     hpBar.style.width = `${hpPercent}%`;
-    hpText.textContent = `${Math.max(0, state.player.hp)} / ${state.player.maxHp}`;
+    const roundedHP = Math.max(0, Math.round(state.player.hp * 10) / 10);
+    hpText.textContent = `${roundedHP} / ${state.player.maxHp}`;
 }
 
 function toggleAttackMode() {
+    if (state.swordDurability <= 0) {
+        showNotification('Нет меча! Создай его в Architect меню');
+        return;
+    }
     state.combat.attackMode = !state.combat.attackMode;
     const attackBtn = document.getElementById('attack-btn');
     if (state.combat.attackMode) {
@@ -2877,7 +3011,7 @@ window.addEventListener('keydown', (e) => {
     state.keys[e.code] = true;
     if (!state.keyPressTime[e.code]) state.keyPressTime[e.code] = Date.now();
     if (e.code === 'Space') { e.preventDefault(); deselectEntity(); } // Space - снять выбор
-    else if (e.code === 'KeyL') toggleFogOfWar(); // L - туман войны
+    else if (e.code === 'KeyL') startRaid(); // L - начать набег
     else if (e.code === 'KeyH') toggleUI(); // H - скрыть интерфейс
     else if (e.code === 'KeyP') toggleDebugTime(); // P - отладка времени
     else if (e.code === 'KeyZ') setOrder('architect'); // Z - режим строительства
@@ -3277,30 +3411,103 @@ function update() {
         updateTimeUI();
     }
     
-    // Update enemies (skeletons) AI
+    // Raid logic
     const now = Date.now();
-    state.enemies.forEach(enemy => {
-        // Find closest player/entity
-        let closestEnt = null;
-        let closestDist = Infinity;
-        state.entities.forEach(ent => {
-            const dx = ent.x - enemy.x;
-            const dy = ent.y - enemy.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closestEnt = ent;
+    const gracePeriodEnd = state.gameStartTime + 120000; // 2 minutes grace period
+    if (!state.raid.active && state.nextRaidTime === 0) {
+        // Initialize next raid time: random delay after grace period ends
+        state.nextRaidTime = gracePeriodEnd + 60000 + Math.random() * 300000; // 1-6 minutes after grace period
+    }
+    if (!state.raid.active && now >= state.nextRaidTime && now >= gracePeriodEnd) {
+        startRaid();
+    }
+    if (state.raid.active) {
+        // Check if raid is over
+        if (now - state.raid.startTime >= state.raid.duration) {
+            state.raid.active = false;
+            // Set next raid time
+            state.nextRaidTime = now + 60000 + Math.random() * 300000;
+            showNotification('Набег окончен!');
+        } else {
+            // Spawn enemies every 2-5 seconds
+            if (now - state.raid.lastSpawnTime >= 2000 + Math.random() * 3000) {
+                spawnRaidEnemy();
+                state.raid.lastSpawnTime = now;
             }
+        }
+    }
+
+    // Update enemies (skeletons) AI
+    // Step 1: Find closest player to all enemies
+    let closestEnt = null;
+    let closestDistGlobal = Infinity;
+    state.entities.forEach(ent => {
+        // Just find any player entity to use as target
+        if (!closestEnt) closestEnt = ent;
+    });
+
+    if (closestEnt) {
+        // Step 2: Count how many are actively attacking (first 4 enemies)
+        let attackingCount = 0;
+        state.enemies.forEach(enemy => {
+            if (!enemy.wandering) attackingCount++;
         });
 
-        if (closestEnt && closestDist <= enemy.detectionRadius) {
-            // Chase the entity
+        // Step 3: Update each enemy
+        state.enemies.forEach(enemy => {
+            const dxToPlayer = closestEnt.x - enemy.x;
+            const dyToPlayer = closestEnt.y - enemy.y;
+            const distToPlayer = Math.sqrt(dxToPlayer * dxToPlayer + dyToPlayer * dyToPlayer);
+
+            // Always track the player, never forget!
             enemy.target = { x: closestEnt.x, y: closestEnt.y };
-            
-            // Attack if close enough
-            if (closestDist <= 1.5 && now - enemy.lastAttackTime >= 1000) {
+
+            // Check if we can be in attacking group
+            if (!enemy.wandering) {
+                if (attackingCount > 4) {
+                    // Too many attackers, switch to wandering
+                    enemy.wandering = true;
+                    attackingCount--;
+                }
+            } else {
+                if (attackingCount < 4) {
+                    // Can join attacking group
+                    enemy.wandering = false;
+                    attackingCount++;
+                }
+            }
+
+            // Determine target position based on state
+            let targetX = closestEnt.x;
+            let targetY = closestEnt.y;
+
+            if (enemy.wandering) {
+                // Wandering: if too far, approach player; else wander nearby
+                if (distToPlayer > 15) {
+                    // Too far, approach player
+                    targetX = closestEnt.x;
+                    targetY = closestEnt.y;
+                } else {
+                    // Wander nearby player
+                    if (!enemy.wanderTarget || Math.random() < 0.02) {
+                        // Pick new wander target near player
+                        const angle = Math.random() * Math.PI * 2;
+                        const wanderDist = 5 + Math.random() * 10;
+                        enemy.wanderTarget = {
+                            x: closestEnt.x + Math.cos(angle) * wanderDist,
+                            y: closestEnt.y + Math.sin(angle) * wanderDist
+                        };
+                    }
+                    targetX = enemy.wanderTarget.x;
+                    targetY = enemy.wanderTarget.y;
+                }
+            }
+
+            // Attack logic if in attacking state
+            if (!enemy.wandering && distToPlayer <= 1.5 && now - enemy.lastAttackTime >= 1000) {
                 // Enemy attacks player!
                 state.player.hp -= enemy.attack;
+                state.player.hp = Math.round(state.player.hp * 10) / 10;
                 enemy.lastAttackTime = now;
                 updateHPUI();
                 
@@ -3311,11 +3518,11 @@ function update() {
             }
             
             // Move towards target, checking for walls
-            const dx = enemy.target.x - enemy.x;
-            const dy = enemy.target.y - enemy.y;
+            const dx = targetX - enemy.x;
+            const dy = targetY - enemy.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist > 0.1) {
-                const speed = 0.04; // Enemy movement speed
+                const speed = enemy.wandering ? 0.02 : 0.04; // Wandering enemies move slower
                 const nextX = enemy.x + (dx / dist) * speed;
                 const nextY = enemy.y + (dy / dist) * speed;
                 const tileX = Math.floor(nextX);
@@ -3328,28 +3535,54 @@ function update() {
                         enemy.x = nextX;
                         enemy.y = nextY;
                     } else {
-                        // If blocked, try to move along one axis only
-                        const nextXOnly = enemy.x + (dx / dist) * speed;
-                        const tileXOnly = Math.floor(nextXOnly);
-                        if (tileXOnly >= 0 && tileXOnly < state.map.width && tileY >= 0 && tileY < state.map.height) {
-                            const tileXOnlyTile = state.map.tiles[tileY][tileXOnly];
-                            if (!tileXOnlyTile.solid) {
-                                enemy.x = nextXOnly;
+                        // Check if it's a player-built wall (WOOD_WALL or WALL) - only attacking enemies break walls
+                        if (!enemy.wandering && (tile.type === TILE_TYPES.WOOD_WALL || tile.type === TILE_TYPES.WALL)) {
+                            // Hit the wall
+                            if (now - enemy.lastWallHitTime >= 500) {
+                                enemy.lastWallHitTime = now;
+                                // Initialize wall HP if not present
+                                if (!tile.wallHP) {
+                                    tile.wallHP = tile.type === TILE_TYPES.WALL ? 30 : 10; // Stone wall stronger
+                                    tile.wallMaxHP = tile.wallHP;
+                                }
+                                tile.wallHP -= 1;
+                                // Mark chunk as dirty
+                                const chunkX = Math.floor(tileX / state.map.chunkSize);
+                                const chunkY = Math.floor(tileY / state.map.chunkSize);
+                                if (state.map.chunks[chunkY] && state.map.chunks[chunkY][chunkX]) {
+                                    state.map.chunks[chunkY][chunkX].dirty = true;
+                                }
+                                // Check if wall breaks
+                                if (tile.wallHP <=0) {
+                                    tile.type = TILE_TYPES.SOIL;
+                                    delete tile.wallHP;
+                                    delete tile.wallMaxHP;
+                                }
                             }
-                        }
-                        const nextYOnly = enemy.y + (dy / dist) * speed;
-                        const tileYOnly = Math.floor(nextYOnly);
-                        if (tileX >= 0 && tileX < state.map.width && tileYOnly >= 0 && tileYOnly < state.map.height) {
-                            const tileYOnlyTile = state.map.tiles[tileYOnly][tileX];
-                            if (!tileYOnlyTile.solid) {
-                                enemy.y = nextYOnly;
+                        } else {
+                            // If blocked by other solid, try to move along one axis only
+                            const nextXOnly = enemy.x + (dx / dist) * speed;
+                            const tileXOnly = Math.floor(nextXOnly);
+                            if (tileXOnly >= 0 && tileXOnly < state.map.width && tileY >= 0 && tileY < state.map.height) {
+                                const tileXOnlyTile = state.map.tiles[tileY][tileXOnly];
+                                if (!tileXOnlyTile.solid) {
+                                    enemy.x = nextXOnly;
+                                }
+                            }
+                            const nextYOnly = enemy.y + (dy / dist) * speed;
+                            const tileYOnly = Math.floor(nextYOnly);
+                            if (tileX >= 0 && tileX < state.map.width && tileYOnly >= 0 && tileYOnly < state.map.height) {
+                                const tileYOnlyTile = state.map.tiles[tileYOnly][tileX];
+                                if (!tileYOnlyTile.solid) {
+                                    enemy.y = nextYOnly;
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-    });
+        });
+    }
     
     state.entities.forEach(ent => {
         if (ent.status !== 'sleeping') {
@@ -3778,6 +4011,79 @@ function render() {
             hpBarWidth * hpPercent, hpBarHeight
         );
     });
+
+    // Draw wall HP bars
+    // Check visible tiles only (for performance)
+    const visibleStartX = Math.max(0, Math.floor(-state.camera.x / state.map.tileSize) - 1);
+    const visibleEndX = Math.min(state.map.width, Math.ceil((-state.camera.x + canvas.width / state.camera.zoom) / state.map.tileSize) + 1);
+    const visibleStartY = Math.max(0, Math.floor(-state.camera.y / state.map.tileSize) - 1);
+    const visibleEndY = Math.min(state.map.height, Math.ceil((-state.camera.y + canvas.height / state.camera.zoom) / state.map.tileSize) + 1);
+    for (let ty = visibleStartY; ty < visibleEndY; ty++) {
+        for (let tx = visibleStartX; tx < visibleEndX; tx++) {
+            const tile = state.map.tiles[ty][tx];
+            if (tile.wallHP) {
+                const hpBarWidth = state.map.tileSize - 4;
+                const hpBarHeight = 4;
+                const hpPercent = tile.wallHP / tile.wallMaxHP;
+                ctx.fillStyle = '#333';
+                ctx.fillRect(
+                    tx * state.map.tileSize + 2, ty * state.map.tileSize + state.map.tileSize - 8,
+                    hpBarWidth, hpBarHeight
+                );
+                ctx.fillStyle = tile.type === TILE_TYPES.WALL ? '#888' : '#8B4513';
+                ctx.fillRect(
+                    tx * state.map.tileSize + 2, ty * state.map.tileSize + state.map.tileSize - 8,
+                    hpBarWidth * hpPercent, hpBarHeight
+                );
+            }
+        }
+    }
+
+    // Draw sword swing animation
+    if (state.swordSwing.active) {
+        const now = Date.now();
+        const swingDuration = 300; // 0.3 seconds
+        const progress = Math.min(1, (now - state.swordSwing.startTime) / swingDuration);
+        
+        if (progress >= 1) {
+            state.swordSwing.active = false;
+        } else {
+            // Find player entity to swing from
+            let playerX = 0, playerY = 0;
+            if (state.entities.length > 0) {
+                playerX = state.entities[0].x;
+                playerY = state.entities[0].y;
+            }
+            
+            const startX = playerX * state.map.tileSize;
+            const startY = playerY * state.map.tileSize;
+            const endX = state.swordSwing.targetX * state.map.tileSize;
+            const endY = state.swordSwing.targetY * state.map.tileSize;
+            
+            // Draw swing arc
+            ctx.save();
+            ctx.translate(startX, startY);
+            const angle = Math.atan2(endY - startY, endX - startX);
+            ctx.rotate(angle - Math.PI / 4 + progress * Math.PI / 2);
+            
+            // Draw sword
+            ctx.fillStyle = '#C0C0C0';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(state.map.tileSize, -5);
+            ctx.lineTo(state.map.tileSize, 5);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Draw glow
+            ctx.shadowColor = '#FF6600';
+            ctx.shadowBlur = 10 * (1 - progress);
+            ctx.strokeStyle = 'rgba(255, 100, 0, ' + (1 - progress) + ')';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
     ctx.restore();
     if (state.selectionBox.active) {
         const minX = Math.min(state.selectionBox.startX, state.selectionBox.endX);
@@ -3893,6 +4199,17 @@ function render() {
     requestAnimationFrame(render);
 }
 window.regenerateWorld = function() {
+    // Reset all resources
+    state.resources = { silver: 0, stone: 0, wood: 0, food: 0, gold: 0 };
+    state.prevResources = { silver: 0, stone: 0, wood: 0, food: 0, gold: 0 };
+    state.pickaxeDurability = 0;
+    state.swordDurability = 0;
+    state.gameStartTime = Date.now(); // Reset game start time
+    // Reset raid state
+    state.raid = { active: false, startTime: 0, duration: 0, lastSpawnTime: 0 };
+    state.nextRaidTime = 0;
+    // Reset enemies
+    state.enemies = [];
     initMap();
     let baseSpawnX = state.map.width / 2; let baseSpawnY = state.map.height / 2;
     const landTiles = [];
@@ -3915,6 +4232,7 @@ window.regenerateWorld = function() {
     state.jobs = [];
     state.camera.x = -(baseSpawnX * state.map.tileSize); state.camera.y = -(baseSpawnY * state.map.tileSize);
     updateCharacterMenu();
+    updateResourceUI();
 };
 
 window.restartGame = function() {
