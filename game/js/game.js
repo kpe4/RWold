@@ -3078,10 +3078,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function toggleUI() { document.getElementById('ui-overlay').classList.toggle('ui-hidden'); }
 
-function toggleFogOfWar() {
-    state.map.fogOfWarEnabled = !state.map.fogOfWarEnabled;
-}
-
 let currentMouseX = 0;
 let currentMouseY = 0;
 window.addEventListener('mousemove', (e) => {
@@ -4385,20 +4381,13 @@ function updateActionPanel() {
 }
 
 window.cancelTask = function(entityId, jobId) {
-    console.log('=== cancelTask START ===');
-    console.log('Input:', entityId, jobId);
-    
     const ent = state.entities.find(e => e.id === entityId);
     if (!ent) {
-        console.log('ERROR: Entity not found!');
         return;
     }
-    console.log('Found entity:', ent.name);
 
     // Cancel current job
     if (ent.job && ent.job.id === jobId) {
-        console.log('Canceling CURRENT job:', ent.job);
-        
         // Refund if needed
         if (ent.job.type === 'build_wall') state.resources.stone += 12;
         if (ent.job.type === 'build_wood_wall') state.resources.wood += 8;
@@ -4417,7 +4406,6 @@ window.cancelTask = function(entityId, jobId) {
         // Next job
         if (ent.taskQueue && ent.taskQueue.length > 0) {
             const nextJob = ent.taskQueue.shift();
-            console.log('Next job from queue:', nextJob);
             assignJobToEntity(ent, nextJob);
         }
     }
@@ -4425,7 +4413,6 @@ window.cancelTask = function(entityId, jobId) {
     else if (ent.taskQueue) {
         const queueIndex = ent.taskQueue.findIndex(j => j.id === jobId);
         if (queueIndex !== -1) {
-            console.log('Canceling QUEUED job at index:', queueIndex);
             const removedJob = ent.taskQueue.splice(queueIndex, 1)[0];
             removedJob.assigned = false;
             
@@ -4438,10 +4425,8 @@ window.cancelTask = function(entityId, jobId) {
     }
     
     state.jobs = state.jobs.filter(j => j.id !== jobId);
-    console.log('Removed job from state.jobs');
     
     updateActionPanel();
-    console.log('=== cancelTask END ===');
 };
 
 window.cancelAllTasks = function() {
@@ -5060,7 +5045,6 @@ function initMapPartial(step) {
     }
 }
 
-// Keep original initMap for regenerateWorld
 function initMap() {
     for (let i = 1; i <= 6; i++) {
         initMapPartial(i);
@@ -5071,32 +5055,3 @@ window.addEventListener('resize', resize);
 resize();
 // Start loading the game
 initGame();
-
-window.regenerateWorld = async function() {
-    // Reset game state
-    state.player.hp = state.player.maxHp;
-    updateHPUI();
-    state.time = { tick: 0, day: 1, hour: 8, minute: 0 };
-    updateTimeUI();
-    state.resources = { silver: 100, stone: 200, wood: 300, gold: 0, food: 200 };
-    updateResourceUI();
-    state.entities = [];
-    state.enemies = [];
-    state.jobs = [];
-    state.depletedBushes = [];
-    state.camera.transition.active = false;
-    state.overworldMap = null;
-    state.caveMap = null;
-    
-    // Show loading screen
-    const loadingScreen = document.getElementById('loading-screen');
-    if (loadingScreen) {
-        loadingScreen.classList.remove('hidden');
-    }
-    
-    // Wait for loading screen to show
-    await new Promise(r => setTimeout(r, 100));
-    
-    // Re-initialize game
-    await initGame();
-};
