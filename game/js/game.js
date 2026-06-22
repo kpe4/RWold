@@ -3434,44 +3434,36 @@ function update() {
     }
 
     // Update enemies (skeletons) AI
-    // Step 1: Find closest player to all enemies
+    // Step 1: Find closest player entity
     let closestEnt = null;
-    let closestDistGlobal = Infinity;
     state.entities.forEach(ent => {
-        // Just find any player entity to use as target
         if (!closestEnt) closestEnt = ent;
     });
 
     if (closestEnt) {
-        // Step 2: Count how many are actively attacking (first 4 enemies)
-        let attackingCount = 0;
-        state.enemies.forEach(enemy => {
-            if (!enemy.wandering) attackingCount++;
+        // Step 2: Calculate distance to player for each enemy
+        const enemiesWithDistance = state.enemies.map(enemy => {
+            const dx = closestEnt.x - enemy.x;
+            const dy = closestEnt.y - enemy.y;
+            return {
+                enemy: enemy,
+                distance: Math.sqrt(dx * dx + dy * dy)
+            };
         });
 
-        // Step 3: Update each enemy
+        // Step 3: Sort enemies by distance (closest first)
+        enemiesWithDistance.sort((a, b) => a.distance - b.distance);
+
+        // Step 4: Mark first 4 as attackers, rest as wanderers
+        enemiesWithDistance.forEach((item, index) => {
+            item.enemy.wandering = index >= 4;
+        });
+
+        // Step 5: Update each enemy
         state.enemies.forEach(enemy => {
             const dxToPlayer = closestEnt.x - enemy.x;
             const dyToPlayer = closestEnt.y - enemy.y;
             const distToPlayer = Math.sqrt(dxToPlayer * dxToPlayer + dyToPlayer * dyToPlayer);
-
-            // Always track the player, never forget!
-            enemy.target = { x: closestEnt.x, y: closestEnt.y };
-
-            // Check if we can be in attacking group
-            if (!enemy.wandering) {
-                if (attackingCount > 4) {
-                    // Too many attackers, switch to wandering
-                    enemy.wandering = true;
-                    attackingCount--;
-                }
-            } else {
-                if (attackingCount < 4) {
-                    // Can join attacking group
-                    enemy.wandering = false;
-                    attackingCount++;
-                }
-            }
 
             // Determine target position based on state
             let targetX = closestEnt.x;
@@ -3499,7 +3491,7 @@ function update() {
                 }
             }
 
-            // Attack logic if in attacking state
+            // Attack logic ONLY if in attacking state (wandering = false)
             if (!enemy.wandering && distToPlayer <= 1.5 && now - enemy.lastAttackTime >= 1000) {
                 // Enemy attacks player!
                 state.player.hp -= enemy.attack;

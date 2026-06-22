@@ -1031,16 +1031,20 @@ button:hover::after {
 
 /* Death Screen */
 #death-screen {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.85);
+    background: rgba(0,0,0,0.95);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 9999;
+    z-index: 100000;
+}
+
+.death-content {
+    text-align: center;
 }
 
 .death-text {
@@ -1050,11 +1054,11 @@ button:hover::after {
     text-shadow: 0 0 20px rgba(255,0,0,0.8), 0 0 40px rgba(255,0,0,0.6);
     letter-spacing: 5px;
     text-transform: uppercase;
+    margin-bottom: 50px;
 }
 
 #restart-btn {
-    margin-top: 40px;
-    padding: 15px 40px;
+    padding: 20px 60px;
     font-family: var(--dota-font-title);
     font-size: 24px;
     color: #fff;
@@ -1064,6 +1068,7 @@ button:hover::after {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 0 20px rgba(255,0,0,0.5);
+    pointer-events: auto;
 }
 
 #restart-btn:hover {

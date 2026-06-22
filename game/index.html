@@ -19,6 +19,13 @@
             <div id="loading-text" class="loading-text">Инициализация...</div>
         </div>
     </div>
+    <div id="death-screen" class="hidden">
+        <div class="death-content">
+            <div class="death-text">Вы погибли</div>
+            <button id="restart-btn" onclick="restartGame()">Создать новый мир</button>
+        </div>
+    </div>
+
     <div id="game-container">
         <div id="custom-cursor"></div>
         <canvas id="gameCanvas"></canvas>
@@ -150,12 +157,6 @@
             <div id="hotkey-tooltip" class="hidden"></div>
 
             <div id="notification" class="hidden"></div>
-            
-
-    <div id="death-screen" class="hidden">
-        <div class="death-text">Вы Мертвы</div>
-        <button id="restart-btn" onclick="restartGame()">Создать новый мир</button>
-    </div>
         </div>
     </div>
     <script src="js/game.js?v=3"></script>
